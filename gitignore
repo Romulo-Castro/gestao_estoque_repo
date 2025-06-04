@@ -1,7 +1,0 @@
-# Node
-**/node_modules/
-
-# Build
-dist/
-build/
-.cache/

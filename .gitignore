@@ -1,0 +1,31 @@
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Node.js dependencies
+**/node_modules/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build directories
+dist/
+build/
+.cache/
+
+# Logs
+logs/
+*.log
+
+# Environment variables
+**/.env
+
+# IDE and Editor settings
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
