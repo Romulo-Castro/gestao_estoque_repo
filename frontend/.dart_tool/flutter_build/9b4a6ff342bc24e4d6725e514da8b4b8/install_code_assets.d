@@ -1,1 +1,0 @@
- C:\\gestao_estoque_repo\\frontend\\.dart_tool\\flutter_build\\9b4a6ff342bc24e4d6725e514da8b4b8\\native_assets.json: 
