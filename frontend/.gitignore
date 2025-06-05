@@ -1,0 +1,22 @@
+# Diretórios e arquivos gerados
+build/
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Configurações específicas de IDE
+.idea/
+.vscode/
+
+# Arquivos temporários e de sistema
+*.iml
+*.log
+*.tmp
+*.swp
+.DS_Store
+
+# Arquivos de cache
+.melody_tool/
+.melos_tool/
+lib.zip

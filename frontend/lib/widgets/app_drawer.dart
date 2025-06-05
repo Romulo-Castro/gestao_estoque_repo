@@ -179,15 +179,14 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.logout),
             title: const Text('Sair'),
             onTap: () async {
-              Navigator.pop(context); // Fecha o drawer
+              // Close the drawer and perform logout
+              Navigator.of(context).pop();
               await authProvider.logout();
-              if (context.mounted) {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  AppRoutes.login,
-                  (route) => false,
-                );
-              }
+              // Navigate to login screen via root navigator, clearing all routes
+              Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+                AppRoutes.login,
+                (route) => false,
+              );
             },
           ),
         ],
