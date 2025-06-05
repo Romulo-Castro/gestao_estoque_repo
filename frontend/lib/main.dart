@@ -211,9 +211,10 @@ class MyApp extends StatelessWidget {
         ),
         debugShowCheckedModeBanner: false, // Remove a faixa "Debug"
         // Widget inicial da aplicação, controlado pelo AuthWrapper
-        home: const AuthWrapper(),
+        initialRoute: '/',
         // Definição das rotas nomeadas
         routes: {
+          '/': (context) => const AuthWrapper(),
           AppRoutes.login: (context) => const LoginScreen(),
           AppRoutes.register: (context) => const RegisterScreen(),
           AppRoutes.welcome: (context) => const WelcomeScreen(),

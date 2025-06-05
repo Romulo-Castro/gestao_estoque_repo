@@ -14,28 +14,32 @@ class ItemGroupListScreen extends StatefulWidget {
 }
 
 class _ItemGroupListScreenState extends State<ItemGroupListScreen> {
+  int? _lastStoreId;
+
   @override
   void initState() {
     super.initState();
-    // Acessar o provider após o build inicial
+    // Removed postFrame init; store changes handled in didChangeDependencies
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Schedule update after build to avoid marking during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
-      if (storeId != null) {
-        Provider.of<ItemGroupProvider>(context, listen: false).setStoreId(storeId);
+      final storeId = Provider.of<StoreProvider>(context).selectedStoreId;
+      if (_lastStoreId != storeId) {
+        _lastStoreId = storeId;
+        if (storeId != null) {
+          Provider.of<ItemGroupProvider>(context, listen: false).setStoreId(storeId);
+        }
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Observar o ID da loja selecionada
-    final storeId = context.watch<StoreProvider>().selectedStoreId;
-    final groupProvider = Provider.of<ItemGroupProvider>(context, listen: false);
-
-    // Se a loja mudar, atualizar o provider
-    if (storeId != null) {
-      groupProvider.setStoreId(storeId);
-    }
+    final storeId = Provider.of<StoreProvider>(context).selectedStoreId;
 
     // Se não houver loja selecionada, mostra uma mensagem
     if (storeId == null) {

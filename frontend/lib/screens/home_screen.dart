@@ -65,17 +65,10 @@ class HomeScreen extends StatelessWidget {
     }
 
     // Se chegou aqui, tem lojas e não está carregando nem com erro
-    final selectedStoreName = storeProvider.selectedStore?.name ?? "Nenhuma Loja Selecionada";
-    
-    // Se não há loja selecionada mas existem lojas, seleciona a primeira
-    if (storeProvider.selectedStore == null && storeProvider.stores.isNotEmpty) {
-      // Seleciona a primeira loja automaticamente
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        storeProvider.selectStore(storeProvider.stores.first);
-      });
-      return const Center(child: CircularProgressIndicator());
-    }
-    
+    final selectedStoreName = storeProvider.selectedStore?.name ?? "Todas as Lojas";
+
+    // nenhuma seleção específica = todas as lojas
+
     double screenWidth = MediaQuery.of(context).size.width;
     int crossAxisCount = screenWidth < 600 ? 2 : (screenWidth < 900 ? 3 : 4);
 
@@ -107,19 +100,32 @@ class HomeScreen extends StatelessWidget {
                         width: double.maxFinite,
                         child: ListView.builder(
                           shrinkWrap: true,
-                          itemCount: storeProvider.stores.length,
+                          itemCount: storeProvider.stores.length + 1,
                           itemBuilder: (ctx, index) {
-                            final store = storeProvider.stores[index];
+                            if (index == 0) {
+                              final isAll = storeProvider.selectedStore == null;
+                              return ListTile(
+                                title: const Text('Todas as Lojas'),
+                                leading: isAll
+                                    ? const Icon(Icons.check_circle, color: Colors.green)
+                                    : const Icon(Icons.storefront_outlined),
+                                onTap: () {
+                                  storeProvider.selectAllStores();
+                                  Navigator.of(ctx).pop();
+                                },
+                              );
+                            }
+                            final store = storeProvider.stores[index - 1];
                             final isSelected = store.id == storeProvider.selectedStoreId;
                             return ListTile(
                               title: Text(store.name),
-                              subtitle: store.address != null && store.address!.isNotEmpty 
-                                ? Text(store.address!) 
-                                : null,
+                              subtitle: store.address != null && store.address!.isNotEmpty
+                                  ? Text(store.address!)
+                                  : null,
                               selected: isSelected,
-                              leading: isSelected 
-                                ? const Icon(Icons.check_circle, color: Colors.green) 
-                                : const Icon(Icons.store_outlined),
+                              leading: isSelected
+                                  ? const Icon(Icons.check_circle, color: Colors.green)
+                                  : const Icon(Icons.store_outlined),
                               onTap: () {
                                 storeProvider.selectStore(store);
                                 Navigator.of(ctx).pop();
@@ -160,11 +166,12 @@ class HomeScreen extends StatelessWidget {
                 title: "Mercadorias",
                 icon: Icons.inventory_2_outlined,
                 onTap: () {
-                  if (storeProvider.selectedStoreId == null) {
-                     ScaffoldMessenger.of(context).showSnackBar(
-                       const SnackBar(content: Text("Selecione uma loja primeiro."))
-                     );
-                     return;
+                  // Permite acesso quando há ao menos uma loja (ou Todas as Lojas)
+                  if (storeProvider.stores.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Nenhuma loja cadastrada.")),
+                    );
+                    return;
                   }
                   Navigator.pushNamed(context, AppRoutes.stockList);
                 },

@@ -39,7 +39,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (success) {
       authProvider.clearError();
-      // AuthWrapper will handle navigation upon auth state change
+      // Reset navigation to root so AuthWrapper can redirect appropriately
+      if (context.mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/',
+          (route) => false,
+        );
+      }
     }
     // If login failed, AuthProvider.error is shown via Consumer
   }

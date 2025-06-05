@@ -147,6 +147,14 @@ class StoreProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Seleciona todas as lojas (view agregada)
+  Future<void> selectAllStores() async {
+    _selectedStore = null;
+    await AppPrefs.setSelectedStoreId(null);
+    notifyListeners();
+    debugPrint("StoreProvider: Todas as lojas selecionadas.");
+  }
+  
   Future<Store> createStore(String name, String? address) async {
     if (_apiService.token == null) throw Exception("Usuário não autenticado.");
     _setLoading(true);

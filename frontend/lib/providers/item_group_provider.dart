@@ -31,7 +31,10 @@ class ItemGroupProvider with ChangeNotifier {
     if (storeId != null && storeId > 0) {
       fetchItemGroups();
     } else {
+      // Clear groups when no valid store selected
       _groups = [];
+      _error = null;
+      _isLoading = false;
       notifyListeners();
     }
   }

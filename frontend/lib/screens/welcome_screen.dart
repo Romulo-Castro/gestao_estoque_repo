@@ -1,227 +1,304 @@
 // lib/screens/welcome_screen.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
-import '../main.dart'; // Para AppRoutes
+import 'package:image_picker/image_picker.dart';
 import '../utils/app_prefs.dart';
+import '../main.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
-  bool _isLoading = false;
-  String? _selectedCompany;
-  String? _selectedBranch;
-  String? _selectedWarehouse;
-  final List<String> _companies = ['Company A', 'Company B'];
-  final List<String> _branches = ['Branch 1', 'Branch 2'];
-  final List<String> _warehouses = ['Warehouse 1', 'Warehouse 2'];
-  final _formKey = GlobalKey<FormState>();
+  final PageController _pageController = PageController();
+  int _currentIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedPreferences();
-  }
+  // câmera picker
+  final ImagePicker _picker = ImagePicker();
 
-  Future<void> _loadSavedPreferences() async {
-    setState(() => _isLoading = true);
-    try {
-      final company = await AppPrefs.getSelectedCompany();
-      final branch = await AppPrefs.getSelectedBranch();
-      final warehouse = await AppPrefs.getSelectedWarehouse();
-      
-      if (mounted) {
-        setState(() {
-          _selectedCompany = company;
-          _selectedBranch = branch;
-          _selectedWarehouse = warehouse;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading preferences: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+  // Step 2 switches
+  final Map<String, bool> _properties = {
+    'Nome': true,
+    'Tags': true,
+    'Código de Barras': true,
+    'Descrição': true,
+    'Unidade de Medida': true,
+    'Imagem': true,
+  };  
+  int _decimalDigits = 0;
+
+  // Step 5 dropdown
+  final List<String> _readers = ['Câmara (Mobile Vision)'];
+  String _selectedReader = 'Câmara (Mobile Vision)';
+
+  void _next() {
+    if (_currentIndex < 4) {
+      _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.ease);
+    } else {
+      _finishOnboarding();
     }
   }
 
-  Future<void> _savePreferencesAndContinue() async {
-    if (!mounted) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      // Save all preferences
-      await AppPrefs.savePreferences(
-        selectedCompany: _selectedCompany ?? '',
-        selectedBranch: _selectedBranch,
-        selectedWarehouse: _selectedWarehouse,
-        firstLaunch: false, // Set to false since we're completing the welcome flow
-      );
-
-      if (!mounted) return;
-
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle_outline, color: Colors.white),
-              SizedBox(width: 8),
-              Text('Preferências salvas com sucesso!'),
-            ],
-          ),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
-
-      // Navigate to home screen
+  Future<void> _finishOnboarding() async {
+    // Mark first launch completed
+    await AppPrefs.setFirstLaunchCompleted(false);
+    // Save selected item properties
+    await AppPrefs.setItemProperties(
+      _properties.entries.where((e) => e.value).map((e) => e.key).toList(),
+    );
+    // Save decimal digits setting
+    await AppPrefs.setQuantityDecimals(_decimalDigits);
+    // Save reader preference
+    await AppPrefs.setString('reader', _selectedReader);
+    // Save sale/purchase usage preference
+    // await AppPrefs.setBool('use_sale_purchase', _useSalePurchase ?? false);
+    // Navigate to home
+    if (context.mounted) {
       Navigator.pushReplacementNamed(context, AppRoutes.home);
-    } catch (e) {
-      if (!mounted) return;
-      
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('Erro ao salvar preferências: ${e.toString()}'),
-              ),
-            ],
-          ),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 4),
-          action: SnackBarAction(
-            label: 'OK',
-            textColor: Colors.white,
-            onPressed: () {
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            },
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
     }
+  }
+
+  Widget _buildDots() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(5, (i) {
+        final active = i == _currentIndex;
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4.0), width: 10, height: 10,
+          decoration: BoxDecoration(color: active ? Colors.white : Colors.lightGreen.withOpacity(0.4), shape: BoxShape.circle),
+        );
+      }),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bem-vindo'),
-        automaticallyImplyLeading: false, // Remove back button
-      ),
+      backgroundColor: Colors.teal[600],
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Configure suas preferências',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Selecione sua empresa, filial e armazém para começar',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-
-                // Company Dropdown
-                DropdownButtonFormField<String>(
-                  value: _selectedCompany,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.business),
-                    labelText: 'Empresa',
-                  ),
-                  items: _companies.map((company) => DropdownMenuItem(
-                    value: company,
-                    child: Text(company),
-                  )).toList(),
-                  onChanged: (value) => setState(() => _selectedCompany = value),
-                  validator: (value) => value == null || value.isEmpty ? 'Selecione uma empresa' : null,
-                ),
-                const SizedBox(height: 16),
-
-                // Branch Dropdown
-                DropdownButtonFormField<String>(
-                  value: _selectedBranch,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.location_city),
-                    labelText: 'Filial',
-                  ),
-                  items: _branches.map((branch) => DropdownMenuItem(
-                    value: branch,
-                    child: Text(branch),
-                  )).toList(),
-                  onChanged: (value) => setState(() => _selectedBranch = value),
-                  validator: (value) => value == null || value.isEmpty ? 'Selecione uma filial' : null,
-                ),
-                const SizedBox(height: 16),
-
-                // Warehouse Dropdown
-                DropdownButtonFormField<String>(
-                  value: _selectedWarehouse,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.warehouse),
-                    labelText: 'Armazém',
-                  ),
-                  items: _warehouses.map((warehouse) => DropdownMenuItem(
-                    value: warehouse,
-                    child: Text(warehouse),
-                  )).toList(),
-                  onChanged: (value) => setState(() => _selectedWarehouse = value),
-                  validator: (value) => value == null || value.isEmpty ? 'Selecione um armazém' : null,
-                ),
-                const Spacer(),
-
-                // Continue Button
-                ElevatedButton(
-                  onPressed: !_isLoading && _formKey.currentState!.validate()
-                      ? _savePreferencesAndContinue
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Text('Continuar'),
-                ),
-              ],
+        child: Stack(children: [
+          PageView(
+            controller: _pageController,
+            onPageChanged: (i) => setState(() => _currentIndex = i),
+            children: [
+              // Step 1
+              _step1(),
+              // Step 2
+              _step2(),
+              // Step 3
+              _step3(),
+              // Step 4
+              _step4(),
+              // Step 5
+              _step5(),
+            ],
+          ),
+          Positioned(
+            bottom: 80,
+            left: 0,
+            right: 0,
+            child: _buildDots(),
+          ),
+          Positioned(
+            bottom: 16, right: 16,
+            child: FloatingActionButton(
+              backgroundColor: Colors.teal[900],
+              elevation: 2,
+              onPressed: _next,
+              child: Icon(
+                _currentIndex < 4 ? Icons.arrow_forward : Icons.check,
+                color: Colors.white,
+              ),
             ),
           ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _step1() {
+    return _buildPage(
+      icon: Icons.inventory_outlined,
+      title: 'Bem-vindo!',
+      body: 'Por favor, siga este assistente para iniciar rapidamente. Posteriormente, poderá alterar qualquer parâmetro em “Configurações”.',
+    );
+  }
+
+  Widget _step2() {
+    return _buildPage(
+      icon: Icons.note_add_outlined,
+      title: 'Selecione as propriedades das mercadorias que deseja usar:',
+      bodyWidget: Column(
+        children: [
+          ..._properties.keys.map((key) => SwitchListTile(
+                tileColor: Colors.transparent,
+                title: Text(key, style: const TextStyle(color: Colors.white, fontSize: 18)),
+                value: _properties[key]!,
+                onChanged: (v) => setState(() => _properties[key] = v),
+              )),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: TextField(
+              style: const TextStyle(color: Colors.black),
+              decoration: const InputDecoration(
+                filled: true,
+                fillColor: Colors.white70, // background adaptado
+                labelText: 'Número de dígitos após o ponto decimal',
+                labelStyle: TextStyle(color: Colors.black), // label agora preta
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.black),
+                ),
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+              onChanged: (val) => setState(() => _decimalDigits = int.tryParse(val) ?? 0),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _step3() {
+    return _buildPage(
+      icon: null,
+      title: 'Selecione a exibição padrão:',
+      bodyWidget: DefaultTabController(
+        length: 2,
+        child: Column(
+          children: [
+            TabBar(
+              indicator: BoxDecoration(
+                color: Colors.teal[900],
+                borderRadius: BorderRadius.circular(4),
+              ),
+              tabs: const [Tab(text: 'Lista'), Tab(text: 'Cartões')],
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  ListView(
+                    padding: const EdgeInsets.all(8),
+                    children: List.generate(6, (i) {
+                      final names = ['BonAqua','Coca-Cola','Fanta','KitKat','M&M’s','Mars'];
+                      return ListTile(
+                        leading: const CircleAvatar(backgroundColor: Colors.white24),
+                        title: Text(names[i], style: const TextStyle(color: Colors.white)),
+                        subtitle: const Text('Qtd: 1 • R\$ 9,99', style: TextStyle(color: Colors.white70)),
+                        trailing: const Icon(Icons.tag, color: Colors.white70),
+                      );
+                    }),
+                  ),
+                  GridView.count(
+                    crossAxisCount: 2,
+                    padding: const EdgeInsets.all(8),
+                    childAspectRatio: 3/2,
+                    children: List.generate(6, (i) {
+                      final names = ['BonAqua','Coca-Cola','Fanta','KitKat','M&M’s','Mars'];
+                      return Card(
+                        color: Colors.white24,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Text(names[i], style: const TextStyle(color: Colors.white)),
+                            const SizedBox(height: 8),
+                            const Text('Qtd: 1 • R\$ 9,99', style: TextStyle(color: Colors.white70)),
+                          ]),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _step4() {
+    return _buildPage(
+      icon: Icons.table_chart,
+      title: 'A aplicação permite importar e exportar de/para Excel',
+      bodyWidget: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('IMPORTANTE', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          Text('Se deseja importar stock inicial – importe para “Documento de Entrada”.', style: TextStyle(color: Colors.white, fontSize: 16)),
+          Text('Se deseja importar apenas a lista de mercadorias e as suas propriedades – importe para o ecrã “Mercadorias”.', style: TextStyle(color: Colors.white, fontSize: 16)),
+          Text('Poderá configurar colunas do Excel em “Configurações → Importar e Exportar”.', style: TextStyle(color: Colors.white, fontSize: 16)),
+        ],
+      ),
+    );
+  }
+
+  Widget _step5() {
+    return _buildPage(
+      icon: Icons.qr_code_scanner,
+      title: 'Se pretender ler códigos de barras, temos vários tipos de leitores.',
+      bodyWidget: Column(children: [
+        const Text('Pode selecionar o tipo que funciona melhor no seu dispositivo.', style: TextStyle(color: Colors.white, fontSize: 16)),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          value: _selectedReader,
+          decoration: const InputDecoration(
+            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white)),
+          ),
+          dropdownColor: Colors.teal[600],
+          items: _readers.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(color: Colors.white)))).toList(),
+          onChanged: (v) => setState(() => _selectedReader = v!),
+        ),
+        const SizedBox(height: 24),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal[900]),
+          onPressed: () async {
+            final XFile? picked = await _picker.pickImage(source: ImageSource.camera);
+            if (picked != null) {
+              showDialog(
+                // ignore: use_build_context_synchronously
+                context: context,
+                builder: (_) => AlertDialog(
+                  backgroundColor: Colors.teal[600],
+                  contentPadding: EdgeInsets.zero,
+                  content: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Align(alignment: Alignment.topRight, child: IconButton(icon: Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.of(context).pop())),
+                    Image.file(File(picked.path)),
+                    TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('FECHAR', style: TextStyle(color: Colors.white))),
+                  ]),
+                ),
+              );
+            }
+          },
+          child: const Text('EXPERIMENTE AGORA'),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildPage({IconData? icon, required String title, String? body, Widget? bodyWidget}) {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (icon != null) ...[
+            Container(
+              margin: const EdgeInsets.only(top: 40, bottom: 24),
+              child: Icon(icon, size: 180, color: Colors.white, shadows: [const Shadow(color: Colors.black26, blurRadius: 4)]),
+            ),
+          ],
+          Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 16),
+          if (body != null)
+            Text(body, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, color: Colors.white)),
+          if (bodyWidget != null) ...[const SizedBox(height: 16), Expanded(child: bodyWidget)],
+        ],
       ),
     );
   }

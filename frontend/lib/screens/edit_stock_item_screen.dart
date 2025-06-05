@@ -11,6 +11,9 @@ import "/providers/item_group_provider.dart"; // Importar provider de grupo
 import "/services/api_service.dart";
 import "/utils/app_prefs.dart";
 import "package:image_picker/image_picker.dart";
+import 'package:mobile_scanner/mobile_scanner.dart';
+import '../widgets/barcode_scanner_page.dart';
+import 'package:file_picker/file_picker.dart';
 
 class EditStockItemScreen extends StatefulWidget {
   final int storeId;
@@ -165,6 +168,24 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
     }
   }
 
+  /// Permite selecionar qualquer arquivo (e não só imagem)
+  Future<void> _pickAnyFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(type: FileType.any);
+      if (result != null && result.files.isNotEmpty && mounted) {
+        final path = result.files.single.path;
+        if (path != null) {
+          setState(() {
+            _selectedImageFile = File(path);
+            _currentImageUrl = null;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) _showErrorSnackbar('Erro ao selecionar arquivo: $e');
+    }
+  }
+
   void _showImageSourceActionSheet(BuildContext context) {
     if (!_activeProperties.contains(AppPrefs.propImage)) {
       _showInfoSnackbar("Gerenciamento de imagens desativado.");
@@ -184,6 +205,11 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
                 leading: const Icon(Icons.photo_library),
                 title: const Text("Escolher da Galeria"),
                 onTap: () { Navigator.of(ctx).pop(); _pickImage(ImageSource.gallery); },
+              ),
+              ListTile(
+                leading: const Icon(Icons.attach_file),
+                title: const Text("Escolher Arquivo"),
+                onTap: () { Navigator.of(ctx).pop(); _pickAnyFile(); },
               ),
               if (_selectedImageFile != null || (_currentImageUrl != null && _currentImageUrl!.isNotEmpty))
                 ListTile(
@@ -343,6 +369,23 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Navega para a página de scanner e obtém o código lido
+  Future<void> _scanBarcode() async {
+    if (!_activeProperties.contains(AppPrefs.propBarcode)) {
+      _showInfoSnackbar('Leitura de código de barras desativada.');
+      return;
+    }
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const BarcodeScannerPage()),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _propControllers[AppPrefs.propBarcode]?.text = result;
+      });
+    }
   }
 
   // Helper para obter a imagem (local ou remota)
@@ -520,6 +563,25 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
                     ..._propControllers.entries.map((entry) {
                       final propKey = entry.key;
                       final controller = entry.value;
+                      // Campo de leitura de código de barras
+                      if (propKey == AppPrefs.propBarcode) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 16.0),
+                          child: TextFormField(
+                            controller: controller,
+                            decoration: InputDecoration(
+                              labelText: "$propKey (opcional)",
+                              prefixIcon: const Icon(Icons.qr_code),
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.camera_alt),
+                                onPressed: _isLoading ? null : _scanBarcode,
+                              ),
+                            ),
+                            enabled: !_isLoading,
+                          ),
+                        );
+                      }
+                      // Campos dinâmicos padrão
                       return Padding(
                         padding: const EdgeInsets.only(top: 16.0),
                         child: TextFormField(
