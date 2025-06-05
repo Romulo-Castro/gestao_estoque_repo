@@ -2,7 +2,7 @@
 const express = require('express');
 const authController = require('../controllers/authController'); // Assumindo que você criará este
 const { validateRegistration, validateLogin, handleValidationErrors } = require('../middleware/validators'); // Assumindo validadores
-const { authenticateToken } = require('../middleware/auth'); // Middleware para autenticação
+const { authenticateToken } = require('../middleware/authMiddleware'); // Middleware para autenticação
 
 const router = express.Router();
 
