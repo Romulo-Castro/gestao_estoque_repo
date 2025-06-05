@@ -1,5 +1,6 @@
 {
   "name": "gestao-estoque-backend",
+  "$schema": "http://json.schemastore.org/package",
   "version": "1.0.0",
   "description": "Backend para o aplicativo de gestão de estoques",
   "main": "src/server.js",
@@ -23,7 +24,7 @@
     "express-validator": "^7.2.1",
     "gestao-estoque-backend": "file:",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^1.5.0",
+    "multer": "^1.4.5",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {

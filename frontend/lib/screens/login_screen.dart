@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart'; // Ajuste o caminho se necessário
+import '../main.dart'; // Para AppRoutes
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,33 +31,17 @@ class _LoginScreenState extends State<LoginScreen> {
     _formKey.currentState!.save(); // Garante que os valores mais recentes sejam usados
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    // DEBUG: Imprima aqui para ver se o método está sendo chamado
-    print("LoginScreen: Tentando fazer login com: ${_emailController.text.trim()}");
 
     final success = await authProvider.login(
       _emailController.text.trim(),
       _passwordController.text,
     );
 
-    // DEBUG: Imprima o valor de success
-    print("LoginScreen: Status do login (success): $success");
-    print("LoginScreen: Widget está montado (mounted): $mounted");
-
-    if (success && mounted) {
-      print("LoginScreen: Navegando para /home"); // DEBUG
-      // Limpa o erro anterior, caso exista, antes de navegar
+    if (success) {
       authProvider.clearError();
-      Navigator.of(context).pushReplacementNamed('/home');
-    } else {
-      // DEBUG: O que aconteceu se não navegou?
-      if (!success) {
-        print("LoginScreen: Login falhou (success == false). Erro do AuthProvider: ${authProvider.error}");
-      }
-      if (!mounted) {
-        print("LoginScreen: Widget não está montado após o login");
-      }
-      // A mensagem de erro já deve ser exibida pelo Consumer do AuthProvider
+      // AuthWrapper will handle navigation upon auth state change
     }
+    // If login failed, AuthProvider.error is shown via Consumer
   }
 
   @override
@@ -139,10 +124,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: const EdgeInsets.only(top: 16),
                         child: Text(
                           authProvider.error!,
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.error,
                           ),
-                          textAlign: TextAlign.center,
                         ),
                       );
                     }
@@ -174,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () {
                     // Limpar erro ao navegar para registro
                     Provider.of<AuthProvider>(context, listen: false).clearError();
-                    Navigator.of(context).pushNamed('/register');
+                    Navigator.of(context).pushNamed(AppRoutes.register);
                   },
                   child: const Text('Não tem uma conta? Registre-se'),
                 ),

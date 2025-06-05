@@ -208,11 +208,11 @@ class DocumentProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final updatedDocument = await _apiService.processDocument(_storeId!, int.parse(id));
-      final index = _documents.indexWhere((d) => d.id == id);
-      if (index != -1) {
-        _documents[index] = updatedDocument;
-      }
+      // processDocument doesn't return the document, just call the endpoint
+      await _apiService.processDocument(_storeId!, int.parse(id));
+      // Optionally update local status if needed, or refetch documents
+      // final idx = _documents.indexWhere((d) => d.id == id);
+      // if (idx != -1) { /* update status or refetch document */ }
       _error = null;
       return true;
     } catch (e) {
@@ -272,42 +272,28 @@ class DocumentProvider with ChangeNotifier {
     }).toList();
   }
 
-  Future<void> fetchDocumentsWithFilters({
-    String? type,
-    String? startDate,
-    String? endDate,
-    int? customerId,
-    int? supplierId,
-  }) async {
+  // Fetch documents with filters
+  Future<void> fetchDocumentsWithFilters(Map<String, dynamic> filters) async {
     if (_authToken == null) {
       _error = 'Não autorizado';
       notifyListeners();
       return;
     }
-
     if (_storeId == null) {
       _error = 'Nenhuma loja selecionada';
       notifyListeners();
       return;
     }
-
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.fetchDocumentsWithFilters(
-        _storeId!,
-        type: type,
-        startDate: startDate,
-        endDate: endDate,
-        customerId: customerId,
-        supplierId: supplierId,
-      );
+      final response = await _apiService.fetchDocumentsWithFilters(_storeId!, filters);
       _documents = response;
       _error = null;
     } catch (e) {
-      _error = 'Erro ao carregar documentos: ${e.toString()}';
+      _error = 'Erro ao filtrar documentos: ${e.toString()}';
       debugPrint(_error);
     } finally {
       _isLoading = false;

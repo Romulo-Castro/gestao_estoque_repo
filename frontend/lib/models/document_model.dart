@@ -53,32 +53,40 @@ enum DocumentType {
 
 String documentTypeToString(DocumentType type) {
   switch (type) {
-    case DocumentType.ENTRADA:
+    case DocumentType.entrada:
       return "ENTRADA";
-    case DocumentType.SAIDA:
+    case DocumentType.saida:
       return "SAIDA";
-    case DocumentType.TRANSFERENCIA:
+    case DocumentType.transferencia:
       return "TRANSFERENCIA";
-    case DocumentType.AJUSTE:
+    case DocumentType.ajuste:
       return "AJUSTE";
+    case DocumentType.ajusteEntrada:
+      return "AJUSTE_ENTRADA";
+    case DocumentType.ajusteSaida:
+      return "AJUSTE_SAIDA";
     default:
       return "UNKNOWN";
   }
 }
 
 DocumentType stringToDocumentType(String? typeStr) {
-  switch (typeStr) {
+  switch (typeStr?.toUpperCase()) {
     case "ENTRADA":
-      return DocumentType.ENTRADA;
+      return DocumentType.entrada;
     case "SAIDA":
-      return DocumentType.SAIDA;
+      return DocumentType.saida;
     case "TRANSFERENCIA":
-      return DocumentType.TRANSFERENCIA;
+      return DocumentType.transferencia;
     case "AJUSTE":
-      return DocumentType.AJUSTE;
+      return DocumentType.ajuste;
+    case "AJUSTE_ENTRADA":
+      return DocumentType.ajusteEntrada;
+    case "AJUSTE_SAIDA":
+      return DocumentType.ajusteSaida;
     default:
       debugPrint("Tipo de documento desconhecido recebido: $typeStr");
-      return DocumentType.ENTRADA;
+      return DocumentType.unknown; // Ou um valor padrão mais apropriado
   }
 }
 

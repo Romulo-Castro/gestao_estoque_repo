@@ -65,7 +65,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // Mostra SnackBar de erro
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(authProvider.authError ?? 'Falha no registro.'),
+          content: Text(authProvider.error ?? 'Falha no registro.'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -95,19 +95,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 16),
                 TextFormField( controller: _confirmPasswordController, decoration: InputDecoration(labelText: 'Confirmar Senha', hintText: 'Digite a senha novamente', prefixIcon: const Icon(Icons.lock_outline), suffixIcon: IconButton(icon: Icon(_obscureConfirmPassword?Icons.visibility_off_outlined:Icons.visibility_outlined), onPressed: ()=>setState(()=>_obscureConfirmPassword=!_obscureConfirmPassword))), obscureText: _obscureConfirmPassword, /*...*/ validator: (v){if(v==null||v.isEmpty)return'Confirme'; if(v!=_passwordController.text)return'Senhas não coincidem'; return null;}, onFieldSubmitted:(_)=>_isRegistering?null:_submit() ),
                 const SizedBox(height: 30),
-                _isRegistering
-                    ? const Center(child: CircularProgressIndicator())
-                    : ElevatedButton.icon( onPressed: _submit, icon: const Icon(Icons.person_add_alt_1), label: const Text('Registrar'), style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),),
-                const SizedBox(height: 15),
                 TextButton(
-                  onPressed: _isRegistering ? null : () { if (Navigator.canPop(context)) { Navigator.pop(context); } },
+                  onPressed: _isRegistering ? null : () => Navigator.pop(context),
                   child: const Text('Já tem conta? Faça login'),
                 ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+                const SizedBox(height: 15),
+                _isRegistering
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton.icon(
+                        onPressed: _submit,
+                        icon: const Icon(Icons.person_add_alt_1),
+                        label: const Text('Registrar'),
+                        style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                      ),
+              ], // children of Column
+            ), // end Column
+          ), // end Form
+        ), // end SingleChildScrollView
+      ), // end Center
+    ); // end Scaffold
   }
 }

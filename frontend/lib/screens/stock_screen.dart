@@ -42,7 +42,7 @@ class _StockScreenState extends State<StockScreen> {
     // Obter a referência ao provider e adicionar listener AQUI
     // É mais seguro que no initState
     final storeProvider = Provider.of<StoreProvider>(context, listen: false);
-    // Remove listener antigo (se houver) e adiciona o novo
+    // Removes old listener if exists
     _storeProviderRef?.removeListener(_storeChangeListener);
     _storeProviderRef = storeProvider;
     _storeProviderRef?.addListener(_storeChangeListener);
@@ -273,12 +273,24 @@ class _StockScreenState extends State<StockScreen> {
   Widget _buildAppDrawer(BuildContext context) {
     final storeProvider = Provider.of<StoreProvider>(context);
     final authProviderRead = context.read<AuthProvider>();
-    final user = authProviderRead.userData;
+    final user = authProviderRead.user;
+    final userName = user?.name ?? 'Usuário';
+    final userEmail = user?.email ?? '';
     final stores = storeProvider.stores;
     final selectedStore = storeProvider.selectedStore;
 
     return Drawer( child: ListView( padding: EdgeInsets.zero, children: <Widget>[
-          UserAccountsDrawerHeader( accountName: Text(user?['name'] ?? 'Usuário'), accountEmail: Text(user?['email'] ?? ''), currentAccountPicture: CircleAvatar(backgroundColor: Colors.white70, child: Text( user?['name']?.substring(0, 1).toUpperCase() ?? '?', style: const TextStyle(fontSize: 40.0, color: Colors.indigo),)),),
+          UserAccountsDrawerHeader(
+            accountName: Text(userName),
+            accountEmail: Text(userEmail),
+            currentAccountPicture: CircleAvatar(
+              backgroundColor: Colors.white70,
+              child: Text(
+                userName.substring(0, 1).toUpperCase(),
+                style: const TextStyle(fontSize: 40.0, color: Colors.indigo),
+              ),
+            ),
+          ),
           const ListTile(title: Text('Lojas', style: TextStyle(fontWeight: FontWeight.bold))),
           if (storeProvider.isLoading && stores.isEmpty) const ListTile(leading: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)), title: Text("Carregando..."))
           else if (stores.isEmpty) ListTile( leading: const Icon(Icons.warning_amber_rounded), title: const Text("Nenhuma loja."), subtitle: const Text("Crie uma em 'Gerenciar'."), onTap: () { Navigator.pop(context); Navigator.pushNamed(context, AppRoutes.storeManagement); }, ),

@@ -14,7 +14,7 @@ class AuthProvider with ChangeNotifier {
 
   AuthProvider(this._apiService) {
     _loadStoredAuth();
-    print("AuthProvider: Inicializado. Tentando carregar auth armazenado.");
+    // print("AuthProvider: Inicializado. Tentando carregar auth armazenado.");
   }
 
   User? get user => _user;
@@ -28,16 +28,16 @@ class AuthProvider with ChangeNotifier {
     final storedToken = prefs.getString('auth_token');
     final storedUserJson = prefs.getString('user_data');
 
-    print("AuthProvider: _loadStoredAuth - Token: $storedToken, UserJSON: $storedUserJson");
+    // print("AuthProvider: _loadStoredAuth - Token: $storedToken, UserJSON: $storedUserJson");
 
     if (storedToken != null && storedUserJson != null) {
       try {
         _token = storedToken;
         _user = User.fromJson(jsonDecode(storedUserJson));
         _apiService.updateAuthToken(storedToken);
-        print("AuthProvider: Auth carregado do SharedPreferences. User: ${_user?.name}");
+        // print("AuthProvider: Auth carregado do SharedPreferences. User: ${_user?.name}");
       } catch (e) {
-        print("AuthProvider: Erro ao decodificar user_data do SharedPreferences: $e");
+        // print("AuthProvider: Erro ao decodificar user_data do SharedPreferences: $e");
         // Limpar dados inválidos
         await prefs.remove('auth_token');
         await prefs.remove('user_data');
@@ -46,7 +46,7 @@ class AuthProvider with ChangeNotifier {
       }
       notifyListeners();
     } else {
-       print("AuthProvider: Nenhum auth encontrado no SharedPreferences.");
+       // print("AuthProvider: Nenhum auth encontrado no SharedPreferences.");
     }
   }
 
@@ -55,12 +55,12 @@ class AuthProvider with ChangeNotifier {
     if (_token != null && _user != null) {
       await prefs.setString('auth_token', _token!);
       await prefs.setString('user_data', jsonEncode(_user!.toJson()));
-      print("AuthProvider: Auth salvo no SharedPreferences. Token: $_token");
+      // print("AuthProvider: Auth salvo no SharedPreferences. Token: $_token");
     } else {
       // Se token ou user for nulo, remover do storage
       await prefs.remove('auth_token');
       await prefs.remove('user_data');
-      print("AuthProvider: Token ou User nulo, removendo do SharedPreferences.");
+      // print("AuthProvider: Token ou User nulo, removendo do SharedPreferences.");
     }
   }
 
@@ -70,9 +70,9 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      print("AuthProvider: Chamando apiService.login com email: $email"); // DEBUG
+      // print("AuthProvider: Chamando apiService.login com email: $email"); // DEBUG
       final response = await _apiService.login(email, password);
-      print("AuthProvider: Resposta da API para login: $response"); // DEBUG
+      // print("AuthProvider: Resposta da API para login: $response"); // DEBUG
 
       // Verificar se a resposta contém 'token' e 'user'
       if (response.containsKey('token') && response.containsKey('user')) {
@@ -80,13 +80,13 @@ class AuthProvider with ChangeNotifier {
         _user = User.fromJson(response['user']); // Certifique-se que User.fromJson está robusto
 
         // DEBUG: Verifique se _token e _user foram preenchidos
-        print("AuthProvider: Token recebido: $_token, User: ${_user?.name}, Email: ${_user?.email}");
+        // print("AuthProvider: Token recebido: $_token, User: ${_user?.name}, Email: ${_user?.email}");
 
         if (_token == null || _user == null) {
           _isLoading = false;
           _error = "Falha ao processar resposta do login (token ou user nulo).";
           notifyListeners();
-          print("AuthProvider: Erro - Token ou User nulo após decodificação.");
+          // print("AuthProvider: Erro - Token ou User nulo após decodificação.");
           return false;
         }
 
@@ -94,19 +94,19 @@ class AuthProvider with ChangeNotifier {
         await _saveAuthData();
         _isLoading = false;
         notifyListeners();
-        print("AuthProvider: Login bem-sucedido, retornando true"); // DEBUG
+        // print("AuthProvider: Login bem-sucedido, retornando true"); // DEBUG
         return true;
       } else {
         _isLoading = false;
         _error = response['message'] ?? "Resposta inesperada do servidor ao fazer login.";
         notifyListeners();
-        print("AuthProvider: Erro - Resposta do login não contém 'token' ou 'user'. Mensagem: $_error");
+        // print("AuthProvider: Erro - Resposta do login não contém 'token' ou 'user'. Mensagem: $_error");
         return false;
       }
     } catch (e) {
       _isLoading = false;
       _error = e.toString().replaceFirst("Exception: ", ""); // Remove o "Exception: " prefixo
-      print("AuthProvider: Erro no login (catch): $_error"); // DEBUG
+      // print("AuthProvider: Erro no login (catch): $_error"); // DEBUG
       notifyListeners();
       return false;
     }
@@ -118,9 +118,9 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      print("AuthProvider: Chamando apiService.register"); // DEBUG
+      // print("AuthProvider: Chamando apiService.register"); // DEBUG
       final response = await _apiService.register(name, email, password);
-      print("AuthProvider: Resposta da API para registro: $response"); // DEBUG
+      // print("AuthProvider: Resposta da API para registro: $response"); // DEBUG
 
       if (response.containsKey('token') && response.containsKey('user')) {
         _token = response['token'];
@@ -129,26 +129,26 @@ class AuthProvider with ChangeNotifier {
         await _saveAuthData();
         _isLoading = false;
         notifyListeners();
-        print("AuthProvider: Registro bem-sucedido");
+        // print("AuthProvider: Registro bem-sucedido");
         return true;
       } else {
         _isLoading = false;
         _error = response['message'] ?? "Resposta inesperada do servidor ao registrar.";
         notifyListeners();
-        print("AuthProvider: Erro - Resposta do registro não contém 'token' ou 'user'. Mensagem: $_error");
+        // print("AuthProvider: Erro - Resposta do registro não contém 'token' ou 'user'. Mensagem: $_error");
         return false;
       }
     } catch (e) {
       _isLoading = false;
       _error = e.toString().replaceFirst("Exception: ", "");
-      print("AuthProvider: Erro no registro (catch): $_error");
+      // print("AuthProvider: Erro no registro (catch): $_error");
       notifyListeners();
       return false;
     }
   }
 
   Future<void> logout() async {
-    print("AuthProvider: Iniciando logout.");
+    // print("AuthProvider: Iniciando logout.");
     _token = null;
     _user = null;
     // final prefs = await SharedPreferences.getInstance(); // Já chamado em _saveAuthData
@@ -159,12 +159,12 @@ class AuthProvider with ChangeNotifier {
     _error = null; // Limpar qualquer erro anterior
     _isLoading = false; // Garantir que o loading não fique preso
     notifyListeners();
-    print("AuthProvider: Logout concluído. isAuthenticated: $isAuthenticated");
+    // print("AuthProvider: Logout concluído. isAuthenticated: $isAuthenticated");
   }
 
   Future<void> fetchUserData() async {
     if (_token == null) {
-      print("AuthProvider: fetchUserData - Token é nulo, não buscando dados do usuário.");
+      // print("AuthProvider: fetchUserData - Token é nulo, não buscando dados do usuário.");
       return;
     }
 
@@ -174,21 +174,21 @@ class AuthProvider with ChangeNotifier {
     // notifyListeners();
 
     try {
-      print("AuthProvider: fetchUserData - Chamando apiService.fetchUserData");
+      // print("AuthProvider: fetchUserData - Chamando apiService.fetchUserData");
       final userData = await _apiService.fetchUserData();
       _user = User.fromJson(userData);
       await _saveAuthData(); // Atualiza o usuário no SharedPreferences se houver mudanças
       _isLoading = false;
       _error = null;
       notifyListeners();
-      print("AuthProvider: fetchUserData - Dados do usuário buscados: ${_user?.name}");
+      // print("AuthProvider: fetchUserData - Dados do usuário buscados: ${_user?.name}");
     } catch (e) {
       _isLoading = false;
       _error = e.toString().replaceFirst("Exception: ", "");
-      print("AuthProvider: fetchUserData - Erro ao buscar dados do usuário: $_error");
+      // print("AuthProvider: fetchUserData - Erro ao buscar dados do usuário: $_error");
       // Considerar fazer logout se o token for inválido (ex: erro 401)
       if (_error != null && (_error!.contains("Token inválido") || _error!.contains("Usuário não encontrado"))) {
-         print("AuthProvider: fetchUserData - Token inválido detectado, fazendo logout.");
+         // print("AuthProvider: fetchUserData - Token inválido detectado, fazendo logout.");
          await logout(); // Isso já notifica os listeners
       } else {
          notifyListeners();
@@ -198,7 +198,7 @@ class AuthProvider with ChangeNotifier {
 
   void clearError() {
     if (_error != null) {
-      print("AuthProvider: Limpando erro: $_error");
+      // print("AuthProvider: Limpando erro: $_error");
       _error = null;
       notifyListeners();
     }

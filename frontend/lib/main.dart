@@ -3,36 +3,36 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 // Importar Providers
-import '/providers/auth_provider.dart';
-import '/providers/store_provider.dart';
-import '/providers/item_group_provider.dart';
-import '/providers/customer_provider.dart';
-import '/providers/supplier_provider.dart';
-import '/providers/document_provider.dart';
-import '/providers/stock_provider.dart';
+import 'providers/auth_provider.dart';
+import 'providers/store_provider.dart';
+import 'providers/item_group_provider.dart';
+import 'providers/customer_provider.dart';
+import 'providers/supplier_provider.dart';
+import 'providers/document_provider.dart';
+import 'providers/stock_provider.dart';
 
 // Importar Telas
-import '/screens/login_screen.dart';
-import '/screens/register_screen.dart';
-import '/screens/stock_screen.dart';
-import '/screens/welcome_screen.dart';
-import '/screens/store_management_screen.dart';
-import '/screens/home_screen.dart';
-import '/screens/item_group_list_screen.dart';
-import '/screens/edit_item_group_screen.dart';
-import '/screens/customer_list_screen.dart';
-import '/screens/edit_customer_screen.dart';
-import '/screens/supplier_list_screen.dart';
-import '/screens/edit_supplier_screen.dart';
-import '/screens/document_list_screen.dart';
-import '/screens/edit_document_screen.dart';
-import '/screens/document_detail_screen.dart';
-import '/screens/reports_screen.dart';
-import '/screens/settings_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
+import 'screens/stock_screen.dart';
+import 'screens/welcome_screen.dart';
+import 'screens/store_management_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/item_group_list_screen.dart';
+import 'screens/edit_item_group_screen.dart';
+import 'screens/customer_list_screen.dart';
+import 'screens/edit_customer_screen.dart';
+import 'screens/supplier_list_screen.dart';
+import 'screens/edit_supplier_screen.dart';
+import 'screens/document_list_screen.dart';
+import 'screens/edit_document_screen.dart';
+import 'screens/document_detail_screen.dart';
+import 'screens/reports_screen.dart';
+import 'screens/settings_screen.dart';
 
 // Importar Utilitários e Preferências
-import '/utils/app_prefs.dart';
-import '/services/api_service.dart';
+import 'utils/app_prefs.dart';
+import 'services/api_service.dart';
 
 // --- Constantes de Rotas Nomeadas ---
 // Centraliza os nomes das rotas para evitar erros de digitação
@@ -41,7 +41,7 @@ class AppRoutes {
   static const register = '/register';
   static const welcome = '/welcome';
   // 'home' agora aponta para o Dashboard principal
-  static const home = '/home_dashboard';
+  static const home = '/home';
   // Rota específica para a tela que lista os itens de estoque
   static const stockList = '/stock-list';
   static const storeManagement = '/store-management';
@@ -80,77 +80,62 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Disponibiliza os providers para toda a árvore de widgets abaixo dele
+    final apiService = ApiService(); // Instancia ApiService uma vez.
+
     return MultiProvider(
       providers: [
         // Provider para Autenticação
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider(apiService)),
 
-        // Provider para Lojas, que depende do estado de autenticação
         ChangeNotifierProxyProvider<AuthProvider, StoreProvider>(
-          // Cria a instância inicial. StoreProvider instancia seu próprio ApiService.
           create: (_) => StoreProvider(),
-          // Atualiza o StoreProvider quando o AuthProvider muda (login/logout)
-          update: (context, auth, previousStoreProvider) {
-            // Chama o método para passar o token atual (ou null) para o StoreProvider
-            previousStoreProvider!.updateAuthToken(auth.token);
-            // Retorna a instância existente do StoreProvider, agora possivelmente atualizada
-            return previousStoreProvider;
+          update: (context, auth, previous) {
+            final provider = previous ?? StoreProvider();
+            provider.updateAuthToken(auth.token);
+            return provider;
           },
         ),
-        
-        // Provider para Estoque
-        ChangeNotifierProxyProvider<AuthProvider, StockProvider>(
-          create: (_) => StockProvider(),
-          update: (context, auth, previousProvider) {
-            previousProvider!.updateAuthToken(auth.token);
-            return previousProvider;
-          },
-        ),
-        
-        // Provider para Grupos de Itens
         ChangeNotifierProxyProvider<AuthProvider, ItemGroupProvider>(
           create: (_) => ItemGroupProvider(),
-          update: (context, auth, previousProvider) {
-            previousProvider!.updateAuthToken(auth.token);
-            return previousProvider;
+          update: (context, auth, previous) {
+            final provider = previous ?? ItemGroupProvider();
+            provider.updateAuthToken(auth.token);
+            return provider;
           },
         ),
-        
-        // Provider para Clientes
         ChangeNotifierProxyProvider<AuthProvider, CustomerProvider>(
           create: (_) => CustomerProvider(),
-          update: (context, auth, previousProvider) {
-            previousProvider!.updateAuthToken(auth.token);
-            return previousProvider;
+          update: (context, auth, previous) {
+            final provider = previous ?? CustomerProvider();
+            provider.updateAuthToken(auth.token);
+            return provider;
           },
         ),
-        
-        // Provider para Fornecedores
         ChangeNotifierProxyProvider<AuthProvider, SupplierProvider>(
           create: (_) => SupplierProvider(),
-          update: (context, auth, previousProvider) {
-            previousProvider!.updateAuthToken(auth.token);
-            return previousProvider;
+          update: (context, auth, previous) {
+            final provider = previous ?? SupplierProvider();
+            provider.updateAuthToken(auth.token);
+            return provider;
           },
         ),
-        
-        // Provider para Documentos
         ChangeNotifierProxyProvider<AuthProvider, DocumentProvider>(
-          create: (context) {
-            final apiService = ApiService(); // Create ApiService instance
-            return DocumentProvider(apiService, null, null);
+          create: (_) => DocumentProvider(apiService, null, null),
+          update: (context, auth, previous) {
+            final provider = previous ?? DocumentProvider(apiService, auth.token, []);
+            provider.updateAuthToken(auth.token);
+            return provider;
           },
-          update: (context, auth, previousProvider) {
-            // If no previous provider exists, create a new one
-            final provider = previousProvider ?? DocumentProvider(ApiService(), null, null);
-            if (auth.token != null) {
-              provider.updateAuthToken(auth.token!);
-            }
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, StockProvider>(
+          create: (_) => StockProvider(),
+          update: (context, auth, previous) {
+            final provider = previous ?? StockProvider();
+            provider.updateAuthToken(auth.token);
             return provider;
           },
         ),
       ],
-      // Widget principal da aplicação
       child: MaterialApp(
         title: 'Gestão de Estoques PRO', // Nome que aparece no gerenciador de apps
         // Definição do Tema Visual
@@ -232,7 +217,7 @@ class MyApp extends StatelessWidget {
           AppRoutes.login: (context) => const LoginScreen(),
           AppRoutes.register: (context) => const RegisterScreen(),
           AppRoutes.welcome: (context) => const WelcomeScreen(),
-          // 'home' agora é o Dashboard
+          // Dashboard route
           AppRoutes.home: (context) => const HomeScreen(),
           // Rota específica para a lista de estoque
           AppRoutes.stockList: (context) => const StockScreen(),

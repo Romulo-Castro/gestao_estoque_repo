@@ -166,8 +166,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final storeProvider = Provider.of<StoreProvider>(context);
     final authProvider = Provider.of<AuthProvider>(context);
-    final userName = authProvider.userData?['name'] ?? 'Usuário';
-    final userEmail = authProvider.userData?['email'] ?? '';
+    final userName = authProvider.user?.name ?? 'Usuário';
+    final userEmail = authProvider.user?.email ?? '';
     final selectedStoreName = storeProvider.selectedStore?.name ?? 'Nenhuma loja selecionada';
     
     return Scaffold(

@@ -264,21 +264,19 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
     // Converter datas para string no formato esperado pela API
     String? startDateStr;
     String? endDateStr;
-    
     if (_startDate != null) {
       startDateStr = DateFormat("yyyy-MM-dd").format(_startDate!);
     }
-    
     if (_endDate != null) {
       endDateStr = DateFormat("yyyy-MM-dd").format(_endDate!);
     }
     
-    // Aplicar filtros
-    docProvider.fetchDocumentsWithFilters(
-      type: _selectedType?.toJson(),
-      startDate: startDateStr,
-      endDate: endDateStr,
-    );
+    // Montar mapa de filtros e chamar o provedor
+    final filters = <String, dynamic>{};
+    if (_selectedType != null) filters['type'] = _selectedType!.toJson();
+    if (startDateStr != null) filters['startDate'] = startDateStr;
+    if (endDateStr != null) filters['endDate'] = endDateStr;
+    docProvider.fetchDocumentsWithFilters(filters);
   }
 
   @override
@@ -360,7 +358,7 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
               return ListTile(
                 leading: Icon(_getDocIcon(doc.type), color: color),
                 title: Text("#${doc.id} - ${documentTypeToString(doc.type)}"),
-                subtitle: Text("Data: $formattedDate ${doc.status != null ? "- ${doc.status}" : ""}"),
+                subtitle: Text("Data: $formattedDate - ${doc.status}"),
                 trailing: doc.status == "CANCELADO"
                     ? const Icon(Icons.cancel, color: Colors.grey)
                     : IconButton(

@@ -1,9 +1,9 @@
 // lib/widgets/app_drawer.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '/main.dart'; // Para AppRoutes
-import '/providers/auth_provider.dart';
-import '/providers/store_provider.dart';
+import '../main.dart'; // Para AppRoutes
+import '../providers/auth_provider.dart';
+import '../providers/store_provider.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -20,8 +20,8 @@ class AppDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final storeProvider = Provider.of<StoreProvider>(context);
-    final userName = authProvider.userData?['name'] ?? 'Usuário';
-    final userEmail = authProvider.userData?['email'] ?? '';
+    final userName = authProvider.user?.name ?? 'Usuário';
+    final userEmail = authProvider.user?.email ?? '';
     final selectedStoreName = storeProvider.selectedStore?.name ?? 'Nenhuma loja selecionada';
 
     return Drawer(
@@ -181,12 +181,11 @@ class AppDrawer extends StatelessWidget {
             onTap: () async {
               Navigator.pop(context); // Fecha o drawer
               await authProvider.logout();
-              // Navega explicitamente para a tela de login
               if (context.mounted) {
                 Navigator.pushNamedAndRemoveUntil(
-                  context, 
-                  AppRoutes.login, 
-                  (route) => false // Remove todas as rotas anteriores
+                  context,
+                  AppRoutes.login,
+                  (route) => false,
                 );
               }
             },

@@ -43,7 +43,6 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
   File? _selectedImageFile;
   String? _currentImageUrl;
   bool _isLoading = false;
-  final bool _isInit = true; // Para carregar dados iniciais apenas uma vez
   bool get _isEditing => widget.initialItem != null;
 
   // Preferências
@@ -542,7 +541,7 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
           ),
           if (_isLoading)
             Container(
-              color: Colors.black.withOpacity(0.3),
+              color: const Color.fromRGBO(0, 0, 0, 0.3),
               child: const Center(child: CircularProgressIndicator()),
             ),
         ],

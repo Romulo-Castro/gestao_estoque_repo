@@ -2,6 +2,7 @@
 const express = require('express');
 const authController = require('../controllers/authController'); // Assumindo que você criará este
 const { validateRegistration, validateLogin, handleValidationErrors } = require('../middleware/validators'); // Assumindo validadores
+const { authenticateToken } = require('../middleware/auth'); // Middleware para autenticação
 
 const router = express.Router();
 
@@ -25,6 +26,6 @@ router.post(
 
 // (Opcional) Rota para obter informações do usuário logado (requer autenticação)
 // GET /api/auth/me
-// router.get('/me', authenticateToken, authController.getMe);
+router.get('/me', authenticateToken, authController.getMe);
 
 module.exports = router;

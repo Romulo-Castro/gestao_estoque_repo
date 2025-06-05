@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'dart:io'; // Para File, se usar upload de imagem
 import 'package:http/http.dart' as http;
 // Importe seus modelos aqui se precisar retornar tipos específicos
-// import '../models/document_model.dart';
-// import '../models/stock_item.dart';
-// import '../models/store_model.dart';
-// ... e outros
+import '../models/document_model.dart';
+import '../models/stock_item.dart';
+import '../models/store_model.dart';
+import '../models/customer_model.dart';
+import '../models/item_group_model.dart';
+import '../models/supplier_model.dart';
 
 class ApiService {
   // ATENÇÃO: Ajuste o IP se necessário.
@@ -18,13 +20,19 @@ class ApiService {
   String? _authToken;
 
   ApiService() {
-    print("ApiService: Instanciado com baseUrl: $baseUrl");
+    // print("ApiService: Instanciado com baseUrl: $baseUrl");
   }
 
   void updateAuthToken(String? token) {
     _authToken = token;
-    print("ApiService: Auth token atualizado para: ${_authToken == null ? 'null' : 'presente'}");
+    // print("ApiService: Auth token atualizado para: ${_authToken == null ? 'null' : 'presente'}");
   }
+
+  // Alias for backward compatibility
+  void setAuthToken(String? token) => updateAuthToken(token);
+
+  // Getter for the current auth token
+  String? get token => _authToken;
 
   Map<String, String> get _headers {
     final headers = {
@@ -40,19 +48,19 @@ class ApiService {
   }
 
   Future<dynamic> _handleResponse(http.Response response) async {
-    print("ApiService: _handleResponse - Status: ${response.statusCode}, Body: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}..."); // Log truncado do body
+    // print("ApiService: _handleResponse - Status: ${response.statusCode}, Body: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}..."); // Log truncado do body
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) {
-        print("ApiService: _handleResponse (Sucesso) - Corpo da resposta vazio.");
+        // print("ApiService: _handleResponse (Sucesso) - Corpo da resposta vazio.");
         return {}; // Retorna um mapa vazio se o corpo estiver vazio
       }
       try {
         final decodedBody = json.decode(response.body);
-        print("ApiService: _handleResponse (Sucesso) - Corpo decodificado: $decodedBody");
+        // print("ApiService: _handleResponse (Sucesso) - Corpo decodificado: $decodedBody");
         return decodedBody;
       } catch (e) {
-        print("ApiService: _handleResponse (Sucesso) - Erro ao decodificar JSON: $e. Corpo original: ${response.body}");
+        // print("ApiService: _handleResponse (Sucesso) - Erro ao decodificar JSON: $e. Corpo original: ${response.body}");
         throw Exception('Falha ao decodificar resposta do servidor.');
       }
     } else {
@@ -68,10 +76,10 @@ class ApiService {
         } catch (e) {
           // Se o corpo do erro não for JSON válido
           errorMessage = 'Erro do servidor: ${response.statusCode}. Detalhes não puderam ser lidos.';
-          print("ApiService: _handleResponse (Erro) - Não foi possível decodificar corpo do erro: ${response.body}");
+          // print("ApiService: _handleResponse (Erro) - Não foi possível decodificar corpo do erro: ${response.body}");
         }
       }
-      print("ApiService: _handleResponse (Erro) - Mensagem: $errorMessage");
+      // print("ApiService: _handleResponse (Erro) - Mensagem: $errorMessage");
       throw Exception(errorMessage);
     }
   }
@@ -83,32 +91,17 @@ class ApiService {
       'email': email,
       'password': password,
     });
-    print("ApiService: Enviando POST para $url com body: $body"); // DEBUG
-
     try {
       final response = await http.post(
         url,
         headers: _headers,
         body: body,
-      ).timeout(const Duration(seconds: 15), onTimeout: () { // Adiciona timeout
-          print("ApiService: Timeout na requisição de login para $url");
-          throw Exception('Tempo limite da requisição excedido ao tentar fazer login.');
-      });
+      ).timeout(const Duration(seconds: 15));
       return await _handleResponse(response);
-    } on SocketException catch (e) {
-        print("ApiService: Erro de Socket (provavelmente sem conexão) no login: $e");
-        throw Exception("Erro de conexão. Verifique sua internet e se o servidor está acessível.");
+    } on SocketException {
+      throw Exception('Erro de conexão. Verifique sua internet e se o servidor está acessível.');
     } on http.ClientException catch (e) {
-        print("ApiService: Erro de Cliente HTTP no login: $e");
-        throw Exception("Erro ao comunicar com o servidor: ${e.message}");
-    } catch (e) {
-      print("ApiService: Erro desconhecido na chamada http.post para login: $e");
-      // Re-throw a exceção para ser tratada pelo AuthProvider
-      // Se já for uma Exception com mensagem útil, apenas re-throw.
-      if (e is Exception) {
-        rethrow;
-      }
-      throw Exception("Erro desconhecido ao tentar fazer login: ${e.toString()}");
+      throw Exception('Erro ao comunicar com o servidor: ${e.message}');
     }
   }
 
@@ -119,8 +112,6 @@ class ApiService {
       'email': email,
       'password': password,
     });
-    print("ApiService: Enviando POST para $url com body: $body");
-
     try {
       final response = await http.post(
         url,
@@ -128,22 +119,16 @@ class ApiService {
         body: body,
       ).timeout(const Duration(seconds: 15));
       return await _handleResponse(response);
-    } on SocketException catch (e) {
-        print("ApiService: Erro de Socket (provavelmente sem conexão) no registro: $e");
-        throw Exception("Erro de conexão. Verifique sua internet e se o servidor está acessível.");
+    } on SocketException {
+      throw Exception('Erro de conexão. Verifique sua internet e se o servidor está acessível.');
     } on http.ClientException catch (e) {
-        print("ApiService: Erro de Cliente HTTP no registro: $e");
-        throw Exception("Erro ao comunicar com o servidor: ${e.message}");
-    } catch (e) {
-      print("ApiService: Erro desconhecido na chamada http.post para registro: $e");
-      if (e is Exception) rethrow;
-      throw Exception("Erro desconhecido ao tentar registrar: ${e.toString()}");
+      throw Exception('Erro ao comunicar com o servidor: ${e.message}');
     }
   }
 
   Future<Map<String, dynamic>> fetchUserData() async {
     final url = Uri.parse('$baseUrl/auth/me');
-    print("ApiService: Enviando GET para $url");
+    // print("ApiService: Enviando GET para $url");
 
     try {
       final response = await http.get(
@@ -151,19 +136,269 @@ class ApiService {
         headers: _headers,
       ).timeout(const Duration(seconds: 10));
       return await _handleResponse(response);
-    } on SocketException catch (e) {
-        print("ApiService: Erro de Socket (provavelmente sem conexão) em fetchUserData: $e");
+    } on SocketException {
+        // print("ApiService: Erro de Socket (provavelmente sem conexão) em fetchUserData: $e");
         throw Exception("Erro de conexão ao buscar dados do usuário.");
     } on http.ClientException catch (e) {
-        print("ApiService: Erro de Cliente HTTP em fetchUserData: $e");
+        // print("ApiService: Erro de Cliente HTTP em fetchUserData: $e");
         throw Exception("Erro ao comunicar com o servidor para buscar dados do usuário: ${e.message}");
     } catch (e) {
-      print("ApiService: Erro desconhecido na chamada http.get para fetchUserData: $e");
+      // print("ApiService: Erro desconhecido na chamada http.get para fetchUserData: $e");
       if (e is Exception) rethrow;
       throw Exception("Erro desconhecido ao buscar dados do usuário: ${e.toString()}");
     }
   }
 
-  // Adicione outros métodos da API aqui (stores, stock, documents, etc.)
-  // ...
+  // Stores endpoints
+  Future<List<Store>> fetchUserStores() async {
+    final url = Uri.parse('$baseUrl/stores');
+    final response = await http.get(url, headers: _headers);
+    final data = await _handleResponse(response) as List;
+    return data.map((e) => Store.fromJson(e)).toList();
+  }
+
+  Future<Store> createStore(String name, String address) async {
+    final url = Uri.parse('$baseUrl/stores');
+    final response = await http.post(
+      url,
+      headers: _headers,
+      body: json.encode({'name': name, 'address': address}),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return Store.fromJson(data);
+  }
+
+  Future<Store> updateStore(int storeId, String name, String address) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId');
+    final response = await http.put(
+      url,
+      headers: _headers,
+      body: json.encode({'name': name, 'address': address}),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return Store.fromJson(data);
+  }
+
+  Future<void> deleteStore(int storeId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId');
+    final response = await http.delete(url, headers: _headers);
+    await _handleResponse(response);
+  }
+
+  // Customers endpoints
+  Future<List<Customer>> fetchCustomers(int storeId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/customers');
+    final response = await http.get(url, headers: _headers);
+    final data = await _handleResponse(response) as List;
+    return data.map((e) => Customer.fromJson(e)).toList();
+  }
+
+  Future<Customer> createCustomer(int storeId, Customer customer) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/customers');
+    final response = await http.post(
+      url,
+      headers: _headers,
+      body: json.encode(customer.toJson()),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return Customer.fromJson(data);
+  }
+
+  Future<Customer> updateCustomer(int storeId, int customerId, Customer customer) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/customers/$customerId');
+    final response = await http.put(
+      url,
+      headers: _headers,
+      body: json.encode(customer.toJson()),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return Customer.fromJson(data);
+  }
+
+  Future<void> deleteCustomer(int storeId, int customerId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/customers/$customerId');
+    final response = await http.delete(url, headers: _headers);
+    await _handleResponse(response);
+  }
+
+  // Item Groups endpoints
+  Future<List<ItemGroup>> fetchItemGroups(int storeId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/groups');
+    final response = await http.get(url, headers: _headers);
+    final data = await _handleResponse(response) as List;
+    return data.map((e) => ItemGroup.fromJson(e)).toList();
+  }
+
+  Future<ItemGroup> createItemGroup(int storeId, ItemGroup group) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/groups');
+    final response = await http.post(
+      url,
+      headers: _headers,
+      body: json.encode(group.toJson()),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return ItemGroup.fromJson(data);
+  }
+
+  Future<ItemGroup> updateItemGroup(int storeId, int groupId, ItemGroup group) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/groups/$groupId');
+    final response = await http.put(
+      url,
+      headers: _headers,
+      body: json.encode(group.toJson()),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return ItemGroup.fromJson(data);
+  }
+
+  Future<void> deleteItemGroup(int storeId, int groupId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/groups/$groupId');
+    final response = await http.delete(url, headers: _headers);
+    await _handleResponse(response);
+  }
+
+  // Stock Items endpoints
+  Future<List<StockItem>> fetchStockItems(int storeId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/stock');
+    final response = await http.get(url, headers: _headers);
+    final data = await _handleResponse(response) as List;
+    return data.map((e) => StockItem.fromJson(e)).toList();
+  }
+
+  Future<StockItem> createStockItem(int storeId, StockItem item) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/stock');
+    final response = await http.post(
+      url,
+      headers: _headers,
+      body: json.encode(item.toJson()),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return StockItem.fromJson(data);
+  }
+
+  Future<StockItem> updateStockItem(int storeId, int itemId, StockItem item) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/stock/$itemId');
+    final response = await http.put(
+      url,
+      headers: _headers,
+      body: json.encode(item.toJson()),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return StockItem.fromJson(data);
+  }
+
+  Future<void> deleteStockItem(int storeId, int itemId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/stock/$itemId');
+    final response = await http.delete(url, headers: _headers);
+    await _handleResponse(response);
+  }
+
+  Future<StockItem> uploadImage(int storeId, int itemId, File file) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/stock/$itemId/image');
+    final request = http.MultipartRequest('POST', url);
+    request.headers.addAll(_headers);
+    request.files.add(await http.MultipartFile.fromPath('productImage', file.path));
+    final streamed = await request.send().timeout(const Duration(seconds: 30));
+    final response = await http.Response.fromStream(streamed);
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return StockItem.fromJson(data);
+  }
+
+  Future<void> deleteItemImage(int storeId, int itemId) async {
+    // Backend does not provide separate delete image route; updateStockItem without image
+    await updateStockItem(storeId, itemId, (await fetchStockItems(storeId)).firstWhere((i) => i.id == itemId).copyWith(imageUrl: null));
+  }
+
+  // Documents endpoints
+  Future<List<Document>> fetchDocuments(int storeId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/documents');
+    final response = await http.get(url, headers: _headers);
+    final data = await _handleResponse(response) as List;
+    return data.map((e) => Document.fromJson(e)).toList();
+  }
+
+  Future<Document> fetchDocumentById(int storeId, int documentId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/documents/$documentId');
+    final response = await http.get(url, headers: _headers);
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return Document.fromJson(data);
+  }
+
+  Future<Document> createDocument(int storeId, Document document) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/documents');
+    final response = await http.post(
+      url,
+      headers: _headers,
+      body: json.encode(document.toJson()),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return Document.fromJson(data);
+  }
+
+  Future<Document> updateDocumentHeader(int storeId, int documentId, Document document) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/documents/$documentId');
+    final response = await http.put(
+      url,
+      headers: _headers,
+      body: json.encode(document.toJson()),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return Document.fromJson(data);
+  }
+
+  Future<void> cancelDocument(int storeId, int documentId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/documents/$documentId');
+    final response = await http.delete(url, headers: _headers);
+    await _handleResponse(response);
+  }
+
+  Future<void> processDocument(int storeId, int documentId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/documents/$documentId/process');
+    final response = await http.post(url, headers: _headers);
+    await _handleResponse(response);
+  }
+
+  Future<List<Document>> fetchDocumentsWithFilters(int storeId, Map<String, dynamic> filters) async {
+    final queryString = Uri(queryParameters: filters.map((k, v) => MapEntry(k, v.toString()))).query;
+    final url = Uri.parse('$baseUrl/stores/$storeId/documents?$queryString');
+    final response = await http.get(url, headers: _headers);
+    final data = await _handleResponse(response) as List;
+    return data.map((e) => Document.fromJson(e)).toList();
+  }
+
+  // Suppliers endpoints
+  Future<List<Supplier>> fetchSuppliers(int storeId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/suppliers');
+    final response = await http.get(url, headers: _headers);
+    final data = await _handleResponse(response) as List;
+    return data.map((e) => Supplier.fromJson(e)).toList();
+  }
+
+  Future<Supplier> createSupplier(int storeId, Supplier supplier) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/suppliers');
+    final response = await http.post(
+      url,
+      headers: _headers,
+      body: json.encode(supplier.toJson()),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return Supplier.fromJson(data);
+  }
+
+  Future<Supplier> updateSupplier(int storeId, int supplierId, Supplier supplier) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/suppliers/$supplierId');
+    final response = await http.put(
+      url,
+      headers: _headers,
+      body: json.encode(supplier.toJson()),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return Supplier.fromJson(data);
+  }
+
+  Future<void> deleteSupplier(int storeId, int supplierId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/suppliers/$supplierId');
+    final response = await http.delete(url, headers: _headers);
+    await _handleResponse(response);
+  }
 }
