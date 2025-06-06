@@ -2,18 +2,15 @@
 import "package:flutter/foundation.dart";
 import "/models/supplier_model.dart";
 import "/services/api_service.dart";
+import "/utils/error_handler.dart";
 
-class SupplierProvider with ChangeNotifier {
+class SupplierProvider with ChangeNotifier, ErrorHandlingMixin {
   final ApiService _apiService;
   int? _storeId;
 
   List<Supplier> _suppliers = [];
-  bool _isLoading = false;
-  String? _error;
 
   List<Supplier> get suppliers => _suppliers;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
 
   // Construtor padrão para uso com ProxyProvider
   SupplierProvider() : _apiService = ApiService(), _storeId = null;
@@ -36,87 +33,63 @@ class SupplierProvider with ChangeNotifier {
     }
   }
 
-  void _setLoading(bool loading) {
-    if (_isLoading == loading) return;
-    _isLoading = loading;
-    if (loading) _error = null;
-    notifyListeners();
-  }
-
-  void _setError(String errorMsg) {
-    _error = errorMsg;
-    _isLoading = false;
-    notifyListeners();
-    debugPrint("SupplierProvider Error (Store: $_storeId): $errorMsg");
-  }
-
   Future<void> fetchSuppliers() async {
     if (_storeId == null || _storeId! <= 0) {
-      _setError("ID da loja inválido para buscar fornecedores.");
+      setError("ID da loja inválido para buscar fornecedores.", 'fetchSuppliers');
       return;
     }
-    _setLoading(true);
-    try {
+    
+    await handleAsyncOperation(() async {
       _suppliers = await _apiService.fetchSuppliers(_storeId!);
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
+      debugPrint("[SupplierProvider] Fornecedores carregados: ${_suppliers.length}");
+    }, 'fetchSuppliers');
+    
+    // Clear suppliers on error
+    if (hasError) {
       _suppliers = [];
     }
   }
 
-  Future<Supplier> createSupplier(Supplier supplier) async {
-    if (_storeId == null || _storeId! <= 0) throw Exception("ID da loja inválido.");
-    _setLoading(true);
-    try {
-      final newSupplier = await _apiService.createSupplier(
-        _storeId!,
-        supplier,
-      );
-      _suppliers.add(newSupplier);
-      _isLoading = false;
-      notifyListeners();
-      return newSupplier;
-    } catch (e) {
-      _setError(e.toString());
-      rethrow;
+  Future<Supplier?> createSupplier(Supplier supplier) async {
+    if (_storeId == null || _storeId! <= 0) {
+      setError('ID da loja inválido.', 'createSupplier');
+      return null;
     }
+    
+    return await handleAsyncOperation(() async {
+      final newSupplier = await _apiService.createSupplier(_storeId!, supplier);
+      _suppliers.add(newSupplier);
+      debugPrint("[SupplierProvider] Fornecedor criado: ${newSupplier.name} (ID: ${newSupplier.id})");
+      return newSupplier;
+    }, 'createSupplier');
   }
 
-  Future<Supplier> updateSupplier(int supplierId, Supplier supplier) async {
-    if (_storeId == null || _storeId! <= 0) throw Exception("ID da loja inválido.");
-    _setLoading(true);
-    try {
-      final updatedSupplier = await _apiService.updateSupplier(
-        _storeId!,
-        supplierId,
-        supplier,
-      );
+  Future<Supplier?> updateSupplier(int supplierId, Supplier supplier) async {
+    if (_storeId == null || _storeId! <= 0) {
+      setError('ID da loja inválido.', 'updateSupplier');
+      return null;
+    }
+    
+    return await handleAsyncOperation(() async {
+      final updatedSupplier = await _apiService.updateSupplier(_storeId!, supplierId, supplier);
       final index = _suppliers.indexWhere((s) => s.id == supplierId);
       if (index != -1) {
         _suppliers[index] = updatedSupplier;
       }
-      _isLoading = false;
-      notifyListeners();
+      debugPrint("[SupplierProvider] Fornecedor atualizado: ${updatedSupplier.name} (ID: $supplierId)");
       return updatedSupplier;
-    } catch (e) {
-      _setError(e.toString());
-      rethrow;
-    }
+    }, 'updateSupplier');
   }
-
   Future<void> deleteSupplier(int supplierId) async {
-    if (_storeId == null || _storeId! <= 0) throw Exception("ID da loja inválido.");
-    _setLoading(true);
-    try {
+    if (_storeId == null || _storeId! <= 0) {
+      setError('ID da loja inválido.', 'deleteSupplier');
+      return;
+    }
+    
+    await handleAsyncOperation(() async {
       await _apiService.deleteSupplier(_storeId!, supplierId);
       _suppliers.removeWhere((s) => s.id == supplierId);
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
-      rethrow;
-    }
+      debugPrint("[SupplierProvider] Fornecedor excluído (ID: $supplierId)");
+    }, 'deleteSupplier');
   }
 }

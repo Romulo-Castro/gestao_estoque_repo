@@ -4,13 +4,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert'; // Para jsonEncode e jsonDecode
 import '../services/api_service.dart'; // Ajuste o caminho se necessário
 import '../models/user_model.dart'; // Ajuste o caminho se necessário
+import '../utils/error_handler.dart'; // Import error handling utility
 
-class AuthProvider with ChangeNotifier {
+class AuthProvider with ChangeNotifier, ErrorHandlingMixin {
   final ApiService _apiService;
   User? _user;
   String? _token;
-  bool _isLoading = false;
-  String? _error;
 
   AuthProvider(this._apiService) {
     _loadStoredAuth();
@@ -20,8 +19,6 @@ class AuthProvider with ChangeNotifier {
   User? get user => _user;
   String? get token => _token;
   bool get isAuthenticated => _token != null && _user != null;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
 
   Future<void> _loadStoredAuth() async {
     final prefs = await SharedPreferences.getInstance();
@@ -43,6 +40,7 @@ class AuthProvider with ChangeNotifier {
         await prefs.remove('user_data');
         _token = null;
         _user = null;
+        ErrorHandler.logError('_loadStoredAuth', e);
       }
       notifyListeners();
     } else {
@@ -62,104 +60,56 @@ class AuthProvider with ChangeNotifier {
       await prefs.remove('user_data');
       // print("AuthProvider: Token ou User nulo, removendo do SharedPreferences.");
     }
-  }
-
-  Future<bool> login(String email, String password) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      // print("AuthProvider: Chamando apiService.login com email: $email"); // DEBUG
+  }  Future<bool> login(String email, String password) async {
+    return await handleAsyncOperation(() async {
       final response = await _apiService.login(email, password);
-      // print("AuthProvider: Resposta da API para login: $response"); // DEBUG
 
-      // Verificar se a resposta contém 'token' e 'user'
-      if (response.containsKey('token') && response.containsKey('user')) {
-        _token = response['token'];
-        _user = User.fromJson(response['user']); // Certifique-se que User.fromJson está robusto
-
-        // DEBUG: Verifique se _token e _user foram preenchidos
-        // print("AuthProvider: Token recebido: $_token, User: ${_user?.name}, Email: ${_user?.email}");
-
-        if (_token == null || _user == null) {
-          _isLoading = false;
-          _error = "Falha ao processar resposta do login (token ou user nulo).";
-          notifyListeners();
-          // print("AuthProvider: Erro - Token ou User nulo após decodificação.");
-          return false;
-        }
-
-        _apiService.updateAuthToken(_token!);
-        await _saveAuthData();
-        _isLoading = false;
-        notifyListeners();
-        // print("AuthProvider: Login bem-sucedido, retornando true"); // DEBUG
-        return true;
-      } else {
-        _isLoading = false;
-        _error = response['message'] ?? "Resposta inesperada do servidor ao fazer login.";
-        notifyListeners();
-        // print("AuthProvider: Erro - Resposta do login não contém 'token' ou 'user'. Mensagem: $_error");
-        return false;
-      }
-    } catch (e) {
-      _isLoading = false;
-      _error = e.toString().replaceFirst("Exception: ", ""); // Remove o "Exception: " prefixo
-      // print("AuthProvider: Erro no login (catch): $_error"); // DEBUG
-      notifyListeners();
-      return false;
-    }
-  }
-
-  Future<bool> register(String name, String email, String password) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      // print("AuthProvider: Chamando apiService.register"); // DEBUG
-      final response = await _apiService.register(name, email, password);
-      // print("AuthProvider: Resposta da API para registro: $response"); // DEBUG
-
-      if (response.containsKey('token') && response.containsKey('user')) {
+      // A resposta já foi processada pelo ApiService._handleResponse
+      // e deve conter apenas o objeto 'data' com token e user
+      if (response.containsKey('token') && 
+          response.containsKey('user')) {
+        
         _token = response['token'];
         _user = User.fromJson(response['user']);
         _apiService.updateAuthToken(_token!);
         await _saveAuthData();
-        _isLoading = false;
-        notifyListeners();
-        // print("AuthProvider: Registro bem-sucedido");
         return true;
-      } else {
-        _isLoading = false;
-        _error = response['message'] ?? "Resposta inesperada do servidor ao registrar.";
-        notifyListeners();
-        // print("AuthProvider: Erro - Resposta do registro não contém 'token' ou 'user'. Mensagem: $_error");
-        return false;
       }
-    } catch (e) {
-      _isLoading = false;
-      _error = e.toString().replaceFirst("Exception: ", "");
-      // print("AuthProvider: Erro no registro (catch): $_error");
-      notifyListeners();
-      return false;
-    }
+      
+      // Se chegou aqui, a resposta não está no formato esperado
+      throw Exception("Resposta inválida do servidor.");
+    }, 'login') ?? false;
+  }
+
+  Future<bool> register(String name, String email, String password) async {
+    return await handleAsyncOperation(() async {      final response = await _apiService.register(name, email, password);
+
+      // A resposta já foi processada pelo ApiService._handleResponse
+      // e deve conter apenas o objeto 'data' com token e user
+      if (response.containsKey('token') && 
+          response.containsKey('user')) {
+        
+        _token = response['token'];
+        _user = User.fromJson(response['user']);
+        _apiService.updateAuthToken(_token!);        await _saveAuthData();
+        return true;
+      }
+      
+      // Se chegou aqui, a resposta não está no formato esperado
+      throw Exception("Resposta inválida do servidor.");
+    }, 'register') ?? false;
   }
 
   Future<void> logout() async {
-    // print("AuthProvider: Iniciando logout.");
+    // print("AuthProvider: Fazendo logout...");
     _token = null;
     _user = null;
-    // final prefs = await SharedPreferences.getInstance(); // Já chamado em _saveAuthData
-    // prefs.remove('auth_token');
-    // prefs.remove('user_data');
     await _saveAuthData(); // Chama o saveAuthData que irá remover se token/user forem nulos
     _apiService.updateAuthToken(null);
-    _error = null; // Limpar qualquer erro anterior
-    _isLoading = false; // Garantir que o loading não fique preso
-    notifyListeners();
+    clearError(); // Limpar qualquer erro anterior usando mixin
+    setLoading(false); // Garantir que o loading não fique preso usando mixin
     // print("AuthProvider: Logout concluído. isAuthenticated: $isAuthenticated");
+    notifyListeners();
   }
 
   Future<void> fetchUserData() async {
@@ -168,73 +118,18 @@ class AuthProvider with ChangeNotifier {
       return;
     }
 
-    _isLoading = true;
-    // Não notificar listeners aqui pode evitar um piscar desnecessário da UI
-    // se o usuário já estiver carregado do SharedPreferences
-    // notifyListeners();
-
-    try {
+    await handleAsyncOperation(() async {
       // print("AuthProvider: fetchUserData - Chamando apiService.fetchUserData");
       final userData = await _apiService.fetchUserData();
       _user = User.fromJson(userData);
       await _saveAuthData(); // Atualiza o usuário no SharedPreferences se houver mudanças
-      _isLoading = false;
-      _error = null;
-      notifyListeners();
       // print("AuthProvider: fetchUserData - Dados do usuário buscados: ${_user?.name}");
-    } catch (e) {
-      _isLoading = false;
-      _error = e.toString().replaceFirst("Exception: ", "");
-      // print("AuthProvider: fetchUserData - Erro ao buscar dados do usuário: $_error");
-      // Considerar fazer logout se o token for inválido (ex: erro 401)
-      if (_error != null && (_error!.contains("Token inválido") || _error!.contains("Usuário não encontrado"))) {
-         // print("AuthProvider: fetchUserData - Token inválido detectado, fazendo logout.");
-         await logout(); // Isso já notifica os listeners
-      } else {
-         notifyListeners();
-      }
-    }
-  }
+    }, 'fetchUserData');
 
-  void clearError() {
-    if (_error != null) {
-      // print("AuthProvider: Limpando erro: $_error");
-      _error = null;
-      notifyListeners();
+    // Handle auth errors specifically for user data fetch
+    if (hasError && ErrorHandler.isAuthError(error)) {
+      // print("AuthProvider: fetchUserData - Token inválido detectado, fazendo logout.");
+      await logout(); // Isso já notifica os listeners
     }
   }
 }
-
-// Certifique-se de que seu modelo User tenha os métodos toJson e fromJson corretos.
-// Exemplo básico de user_model.dart:
-/*
-// lib/models/user_model.dart
-class User {
-  final int id;
-  final String name;
-  final String email;
-  // Adicione outros campos conforme necessário (e.g., createdAt, updatedAt)
-
-  User({
-    required this.id,
-    required this.name,
-    required this.email,
-  });
-
-  factory User.fromJson(Map<String, dynamic> json) {
-    return User(
-      id: json['id'] as int,
-      name: json['name'] as String,
-      email: json['email'] as String,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'email': email,
-    };
-  }
-}
-*/

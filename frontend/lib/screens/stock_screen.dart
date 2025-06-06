@@ -5,10 +5,13 @@ import '/models/stock_item.dart';
 import '/models/store_model.dart';
 import '/providers/store_provider.dart';
 import '/providers/auth_provider.dart';
+import '/providers/layout_provider.dart';
 import '/services/api_service.dart';
 import '/screens/edit_stock_item_screen.dart';
+import '/screens/bulk_import_screen.dart';
 import '/utils/app_prefs.dart';
 import '/main.dart'; // Para AppRoutes
+import '/utils/error_handler.dart';
 
 class StockScreen extends StatefulWidget {
   const StockScreen({super.key});
@@ -207,25 +210,186 @@ class _StockScreenState extends State<StockScreen> {
     }
   }
 
+  // Navega para a tela de importação em massa
+  Future<void> _navigateToBulkImport() async {
+    // ★★★ VERIFICAÇÃO mounted ANTES DE USAR context ★★★
+    if (!mounted) return;
+
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const BulkImportScreen(),
+      ),
+    );
+
+    // ★★★ VERIFICAÇÃO mounted APÓS await ★★★
+    if (result == true && mounted) {
+      _showSnackbar("Importação concluída. Atualizando lista...", Colors.green);
+      // Recarrega a lista se houve sucesso na importação
+      if (_currentStoreId != null) {
+        _loadStockItems(storeId: _currentStoreId!, showLoading: false);
+      }
+    }
+  }
+
   // Exibe uma SnackBar
   void _showSnackbar(String message, [Color? backgroundColor]) {
     // ★★★ VERIFICAÇÃO mounted ANTES DE USAR context ★★★
     if (!mounted) return;
-    ScaffoldMessenger.of(context).removeCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(message),
-          backgroundColor: backgroundColor,
-          duration: const Duration(seconds: 2) // Duração padrão
-      ),
+    
+    if (backgroundColor == Colors.green) {
+      ErrorHandler.showSuccessSnackBar(context, message);
+    } else if (backgroundColor == Colors.red || backgroundColor == Colors.orange) {
+      ErrorHandler.showErrorSnackBar(context, message);
+    } else {
+      // Use default success for general messages
+      ErrorHandler.showSuccessSnackBar(context, message);
+    }
+  }
+
+  // Constrói a view baseada no tipo de layout selecionado
+  Widget _buildLayoutBasedView(int currentStoreId, LayoutType layoutType) {
+    switch (layoutType) {
+      case LayoutType.list:
+        return _buildListView(currentStoreId);
+      case LayoutType.grid:
+        return _buildGridView(currentStoreId);
+      case LayoutType.card:
+        return _buildCardView(currentStoreId);
+    }
+  }
+
+  // Constrói uma visualização em cards (mais detalhada que grid)
+  Widget _buildCardView(int currentStoreId) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(8.0),
+      itemCount: _stockItems.length,
+      itemBuilder: (context, index) {
+        final item = _stockItems[index];
+        final imageUrl = item.imageUrl;
+        final bool hasImage = imageUrl != null && imageUrl.isNotEmpty;
+        
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 4.0),
+          elevation: 2.0,
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: InkWell(
+              onTap: () => _navigateToEditItem(currentStoreId, item: item),
+              child: Row(
+                children: [
+                  // Imagem do produto
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8.0),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      children: [
+                        if (hasImage)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8.0),
+                            child: Image.network(
+                              imageUrl,
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(Icons.broken_image, color: Colors.grey);
+                              },
+                            ),
+                          )
+                        else
+                          const Center(
+                            child: Icon(Icons.inventory_2_outlined, color: Colors.grey, size: 40),
+                          ),
+                        if (hasImage)
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor.withOpacity(0.7),
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(8.0),
+                                  bottomRight: Radius.circular(8.0),
+                                ),
+                              ),
+                              padding: const EdgeInsets.all(4),
+                              child: const Icon(
+                                Icons.photo,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Informações do produto
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Quantidade: ${_formatQuantity(item.quantity)} ${item.properties['unit'] ?? 'UN'}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Categoria: ${item.properties[AppPrefs.propCategory] ?? 'N/A'}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (item.properties['barcode'] != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Código: ${item.properties['barcode']}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  // Ícone de navegação
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
-  // Alterna o layout e salva a preferência
+  // Remove métodos antigos não utilizados
+  // Alterna o layout e salva a preferência (método obsoleto - mantido para compatibilidade)
   void _toggleLayout() {
-    // setState é síncrono, OK aqui
+    // Este método não é mais usado, mas mantido para evitar erros
     setState(() { _useCardLayout = !_useCardLayout; });
-    // Salva preferência (async, mas não esperamos nem atualizamos UI com base nisso)
     AppPrefs.setUseCardLayout(_useCardLayout);
   }
 
@@ -239,8 +403,7 @@ class _StockScreenState extends State<StockScreen> {
   Widget build(BuildContext context) {
     // Assiste (watch) para reagir a mudanças na loja selecionada
     final storeProvider = Provider.of<StoreProvider>(context);
-    // Lê (read) para ações que não precisam de rebuild (logout)
-    final authProviderRead = context.read<AuthProvider>();
+    final layoutProvider = Provider.of<LayoutProvider>(context);
     final selectedStore = storeProvider.selectedStore;
 
     // Log para ajudar a entender o estado atual durante o build
@@ -250,13 +413,58 @@ class _StockScreenState extends State<StockScreen> {
       appBar: AppBar(
         title: Text(selectedStore?.name ?? 'Nenhuma Loja'),
         actions: [ /* ... Ações como antes (já usam _isLoading) ... */
-          IconButton( icon: Icon(_useCardLayout ? Icons.view_list_outlined : Icons.view_module_outlined), tooltip: 'Alternar Layout', onPressed: _toggleLayout,),
-          IconButton( icon: const Icon(Icons.refresh), tooltip: 'Atualizar Lista', onPressed: (_isLoading || selectedStore == null) ? null : () => _loadStockItems(storeId: selectedStore.id), ),
-          IconButton( icon: const Icon(Icons.logout), tooltip: 'Sair', onPressed: () async { await authProviderRead.logout(); }, ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'Mais opções',
+            enabled: selectedStore != null && !_isLoading,
+            onSelected: (value) {
+              switch (value) {
+                case 'import':
+                  _navigateToBulkImport();
+                  break;
+                case 'refresh':
+                  _loadStockItems(storeId: selectedStore!.id);
+                  break;
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'import',
+                child: Row(
+                  children: [
+                    Icon(Icons.file_upload),
+                    SizedBox(width: 8),
+                    Text('Importar Mercadorias'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'refresh',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh),
+                    SizedBox(width: 8),
+                    Text('Atualizar Lista'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          IconButton( 
+            icon: Icon(layoutProvider.stockLayoutType == LayoutType.list ? Icons.view_module_outlined : Icons.view_list_outlined), 
+            tooltip: 'Alternar Layout', 
+            onPressed: () {
+              final nextLayout = layoutProvider.stockLayoutType == LayoutType.list 
+                  ? LayoutType.grid 
+                  : LayoutType.list;
+              layoutProvider.setStockLayoutType(nextLayout);
+            },
+          ),
+
         ],
       ),
       drawer: _buildAppDrawer(context), // O Drawer já usa Provider.of
-      body: _buildBody(selectedStore), // Passa a loja selecionada para o método de build do corpo
+      body: _buildBody(selectedStore, layoutProvider), // Passa a loja selecionada e layout provider para o método de build do corpo
       floatingActionButton: selectedStore == null
           ? null
           : FloatingActionButton(
@@ -272,8 +480,7 @@ class _StockScreenState extends State<StockScreen> {
   // Constrói o Drawer (sem mudanças significativas, adicionando consts)
   Widget _buildAppDrawer(BuildContext context) {
     final storeProvider = Provider.of<StoreProvider>(context);
-    final authProviderRead = context.read<AuthProvider>();
-    final user = authProviderRead.user;
+    final user = Provider.of<AuthProvider>(context, listen: false).user;
     final userName = user?.name ?? 'Usuário';
     final userEmail = user?.email ?? '';
     final stores = storeProvider.stores;
@@ -303,23 +510,22 @@ class _StockScreenState extends State<StockScreen> {
           ListTile( leading: const Icon(Icons.receipt_long_outlined), title: const Text('Documentos'), onTap: () { Navigator.pop(context); Navigator.pushNamed(context, AppRoutes.documentList);},),
           ListTile( leading: const Icon(Icons.assessment_outlined), title: const Text('Relatórios'), onTap: () { Navigator.pop(context); Navigator.pushNamed(context, AppRoutes.reports); },),
           const Divider(),
-          ListTile( leading: const Icon(Icons.logout, color: Colors.red), title: const Text('Sair', style: TextStyle(color: Colors.red)), onTap: () async { Navigator.pop(context); await authProviderRead.logout(); }, ),
         ],
       ),
     );
   }
 
   // Constrói o corpo principal
-  Widget _buildBody(Store? selectedStore) {
+  Widget _buildBody(Store? selectedStore, LayoutProvider layoutProvider) {
     if (selectedStore == null) { return const Center(child: Padding( padding: EdgeInsets.all(20.0), child: Text( 'Selecione uma loja no menu lateral para visualizar o estoque ou crie uma nova em "Gerenciar Lojas".', textAlign: TextAlign.center, ),)); }
     if (_isLoading && _stockItems.isEmpty) { return const Center(child: CircularProgressIndicator()); }
     if (_errorMessage != null) { return Center( child: Padding( padding: const EdgeInsets.all(16.0), child: Column( mainAxisSize: MainAxisSize.min, children: [ const Icon(Icons.error_outline, color: Colors.red, size: 48), const SizedBox(height: 16), Text('Erro ao carregar dados:', style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 8), Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: Colors.red[700])), const SizedBox(height: 20), ElevatedButton.icon( icon: const Icon(Icons.refresh), label: const Text('Tentar Novamente'), onPressed: () => _loadStockItems(storeId: selectedStore.id), ) ]))); }
     if (_stockItems.isEmpty) { return Center( child: Text( 'Nenhum item cadastrado nesta loja (${selectedStore.name}).\nUse o botão "+" para adicionar.', textAlign: TextAlign.center, )); }
 
-    // Lista ou Grid
+    // Lista ou Grid baseado no LayoutProvider
     return RefreshIndicator(
       onRefresh: () => _loadStockItems(storeId: selectedStore.id, showLoading: false),
-      child: _useCardLayout ? _buildGridView(selectedStore.id) : _buildListView(selectedStore.id),
+      child: _buildLayoutBasedView(selectedStore.id, layoutProvider.stockLayoutType),
     );
   }
 
@@ -375,12 +581,50 @@ class _StockScreenState extends State<StockScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded( flex: 3, child: hasImage
-                    ? Image.network( imageUrl, fit: BoxFit.cover,
-                        loadingBuilder: (ctx, child, progress) => progress == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                        errorBuilder: (ctx, error, stack) { return Container(color: Colors.grey[200], child: const Center(child: Icon(Icons.broken_image, color: Colors.grey))); }
-                      )
-                    : Container(color: Colors.grey[200], child: const Center(child: Icon(Icons.inventory_2_outlined, color: Colors.grey, size: 40))),
+                Expanded( 
+                  flex: 3, 
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      hasImage
+                        ? Image.network(
+                            imageUrl, 
+                            fit: BoxFit.cover,
+                            loadingBuilder: (ctx, child, progress) => progress == null 
+                              ? child 
+                              : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                            errorBuilder: (ctx, error, stack) { 
+                              return Container(
+                                color: Colors.grey[200], 
+                                child: const Center(child: Icon(Icons.broken_image, color: Colors.grey))
+                              ); 
+                            }
+                          )
+                        : Container(
+                            color: Colors.grey[200], 
+                            child: const Center(child: Icon(Icons.inventory_2_outlined, color: Colors.grey, size: 40))
+                          ),
+                      if (hasImage)
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).primaryColor.withOpacity(0.7),
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(8.0),
+                              ),
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: const Icon(
+                              Icons.photo,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
                 Expanded( flex: 2, child: Padding( padding: const EdgeInsets.all(8.0), child: Column( crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
                       Text(item.name, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),

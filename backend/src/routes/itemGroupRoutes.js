@@ -1,7 +1,7 @@
 // src/routes/itemGroupRoutes.js
 const express = require("express");
 const itemGroupController = require("../controllers/itemGroupController");
-const { validate } = require("../middleware/validators"); // Reutilizar se houver validações
+const { validateItemGroup, validateIdParam, handleValidationErrors } = require("../middleware/validators");
 
 // Usar mergeParams é crucial aqui porque este router será montado sob /stores/:storeId
 const router = express.Router({ mergeParams: true });
@@ -10,10 +10,27 @@ const router = express.Router({ mergeParams: true });
 
 // Rotas para Grupos de Itens dentro de uma Loja
 router.get("/", itemGroupController.getAllGroups);
-router.post("/", /* TODO: Adicionar validação se necessário */ itemGroupController.createGroup);
-router.get("/:groupId", itemGroupController.getGroupById);
-router.put("/:groupId", /* TODO: Adicionar validação se necessário */ itemGroupController.updateGroup);
-router.delete("/:groupId", itemGroupController.deleteGroup);
+router.post("/", 
+    validateItemGroup(),
+    handleValidationErrors,
+    itemGroupController.createGroup
+);
+router.get("/:groupId", 
+    validateIdParam('groupId'),
+    handleValidationErrors,
+    itemGroupController.getGroupById
+);
+router.put("/:groupId", 
+    validateIdParam('groupId'),
+    validateItemGroup(),
+    handleValidationErrors,
+    itemGroupController.updateGroup
+);
+router.delete("/:groupId", 
+    validateIdParam('groupId'),
+    handleValidationErrors,
+    itemGroupController.deleteGroup
+);
 
 module.exports = router;
 

@@ -2,18 +2,15 @@
 import "package:flutter/foundation.dart";
 import "/models/stock_item.dart";
 import "/services/api_service.dart";
+import "/utils/error_handler.dart";
 
-class StockProvider with ChangeNotifier {
+class StockProvider with ChangeNotifier, ErrorHandlingMixin {
   final ApiService _apiService;
   int? _storeId;
 
   List<StockItem> _items = [];
-  bool _isLoading = false;
-  String? _error;
 
   List<StockItem> get items => _items;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
 
   // Construtor padrão para uso com ProxyProvider
   StockProvider() : _apiService = ApiService(), _storeId = null;
@@ -36,80 +33,64 @@ class StockProvider with ChangeNotifier {
     }
   }
 
-  void _setLoading(bool loading) {
-    if (_isLoading == loading) return;
-    _isLoading = loading;
-    if (loading) _error = null;
-    notifyListeners();
-  }
-
-  void _setError(String errorMsg) {
-    _error = errorMsg;
-    _isLoading = false;
-    notifyListeners();
-    debugPrint("StockProvider Error (Store: $_storeId): $errorMsg");
-  }
-
   Future<void> fetchStockItems() async {
     if (_storeId == null || _storeId! <= 0) {
-      _setError("ID da loja inválido para buscar itens.");
+      setError("ID da loja inválido para buscar itens.", 'fetchStockItems');
       return;
     }
-    _setLoading(true);
-    try {
+    
+    await handleAsyncOperation(() async {
       _items = await _apiService.fetchStockItems(_storeId!);
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
+      debugPrint("[StockProvider] Itens carregados: ${_items.length}");
+    }, 'fetchStockItems');
+    
+    // Clear items on error
+    if (hasError) {
       _items = [];
     }
   }
 
-  Future<StockItem> createStockItem(StockItem item) async {
-    if (_storeId == null || _storeId! <= 0) throw Exception("ID da loja inválido.");
-    _setLoading(true);
-    try {
+  Future<StockItem?> createStockItem(StockItem item) async {
+    if (_storeId == null || _storeId! <= 0) {
+      setError('ID da loja inválido.', 'createStockItem');
+      return null;
+    }
+    
+    return await handleAsyncOperation(() async {
       final newItem = await _apiService.createStockItem(_storeId!, item);
       _items.add(newItem);
-      _isLoading = false;
-      notifyListeners();
+      debugPrint("[StockProvider] Item criado: ${newItem.name} (ID: ${newItem.id})");
       return newItem;
-    } catch (e) {
-      _setError(e.toString());
-      rethrow;
-    }
+    }, 'createStockItem');
   }
 
-  Future<StockItem> updateStockItem(int itemId, StockItem item) async {
-    if (_storeId == null || _storeId! <= 0) throw Exception("ID da loja inválido.");
-    _setLoading(true);
-    try {
+  Future<StockItem?> updateStockItem(int itemId, StockItem item) async {
+    if (_storeId == null || _storeId! <= 0) {
+      setError('ID da loja inválido.', 'updateStockItem');
+      return null;
+    }
+    
+    return await handleAsyncOperation(() async {
       final updatedItem = await _apiService.updateStockItem(_storeId!, itemId, item);
       final index = _items.indexWhere((i) => i.id == itemId);
       if (index != -1) {
         _items[index] = updatedItem;
       }
-      _isLoading = false;
-      notifyListeners();
+      debugPrint("[StockProvider] Item atualizado: ${updatedItem.name} (ID: $itemId)");
       return updatedItem;
-    } catch (e) {
-      _setError(e.toString());
-      rethrow;
-    }
+    }, 'updateStockItem');
   }
 
   Future<void> deleteStockItem(int itemId) async {
-    if (_storeId == null || _storeId! <= 0) throw Exception("ID da loja inválido.");
-    _setLoading(true);
-    try {
+    if (_storeId == null || _storeId! <= 0) {
+      setError('ID da loja inválido.', 'deleteStockItem');
+      return;
+    }
+    
+    await handleAsyncOperation(() async {
       await _apiService.deleteStockItem(_storeId!, itemId);
       _items.removeWhere((i) => i.id == itemId);
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
-      rethrow;
-    }
+      debugPrint("[StockProvider] Item excluído (ID: $itemId)");
+    }, 'deleteStockItem');
   }
 }

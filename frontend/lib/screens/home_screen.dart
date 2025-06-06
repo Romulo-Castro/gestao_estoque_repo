@@ -3,18 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '/main.dart'; // Para AppRoutes
 import '/providers/store_provider.dart';
+import '/providers/dashboard_provider.dart';
 import '/widgets/app_drawer.dart'; // Importar o Drawer
 import '/widgets/home_card.dart'; // Importar o Card
 import '/widgets/barcode_scanner_page.dart'; // Importar o scanner
+import '/utils/error_handler.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
   // Helper para mostrar snackbar de funcionalidades não implementadas
   void _showTodoSnackbar(BuildContext context, String featureName) {
-    ScaffoldMessenger.of(context).removeCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("$featureName ainda não implementado."), duration: const Duration(seconds: 2))
-    );
+    ErrorHandler.showErrorSnackBar(context, "$featureName ainda não implementado.");
   }
 
   // Helper para criar uma nova loja
@@ -25,6 +24,7 @@ class HomeScreen extends StatelessWidget {
   // Helper para o conteúdo principal da tela
   Widget _buildBody(BuildContext context) {
     final storeProvider = context.watch<StoreProvider>();
+    final dashboardProvider = context.watch<DashboardProvider>();
 
     if (storeProvider.isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -62,6 +62,13 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       );
+    }
+
+    // Atualizar dashboard quando loja mudar
+    if (storeProvider.selectedStore != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        dashboardProvider.setStoreId(storeProvider.selectedStore!.id);
+      });
     }
 
     // Se chegou aqui, tem lojas e não está carregando nem com erro
@@ -165,12 +172,12 @@ class HomeScreen extends StatelessWidget {
               HomeCard(
                 title: "Mercadorias",
                 icon: Icons.inventory_2_outlined,
+                count: dashboardProvider.stats.totalProducts,
+                isLoading: dashboardProvider.isLoading,
                 onTap: () {
                   // Permite acesso quando há ao menos uma loja (ou Todas as Lojas)
                   if (storeProvider.stores.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Nenhuma loja cadastrada.")),
-                    );
+                    ErrorHandler.showErrorSnackBar(context, "Nenhuma loja cadastrada.");
                     return;
                   }
                   Navigator.pushNamed(context, AppRoutes.stockList);
@@ -180,6 +187,8 @@ class HomeScreen extends StatelessWidget {
                 title: "Documentos",
                 icon: Icons.receipt_long_outlined,
                 iconColor: Colors.orange[700],
+                count: dashboardProvider.stats.totalDocuments,
+                isLoading: dashboardProvider.isLoading,
                 onTap: () => Navigator.pushNamed(context, AppRoutes.documentList),
               ),              HomeCard(
                 title: "Relatórios",
@@ -231,24 +240,30 @@ class HomeScreen extends StatelessWidget {
                 title: "Clientes",
                 icon: Icons.people_alt_outlined,
                 iconColor: Colors.lightBlue[700],
+                count: dashboardProvider.stats.totalCustomers,
+                isLoading: dashboardProvider.isLoading,
                 onTap: () => Navigator.pushNamed(context, AppRoutes.customerList),
               ),
               HomeCard(
                 title: "Fornecedores",
                 icon: Icons.groups_outlined,
                 iconColor: Colors.brown[700],
+                count: dashboardProvider.stats.totalSuppliers,
+                isLoading: dashboardProvider.isLoading,
                 onTap: () => Navigator.pushNamed(context, AppRoutes.supplierList),
               ),
               HomeCard(
                 title: "Grupos",
                 icon: Icons.category_outlined,
                 iconColor: Colors.amber[700],
+                count: dashboardProvider.stats.totalGroups,
+                isLoading: dashboardProvider.isLoading,
                 onTap: () => Navigator.pushNamed(context, AppRoutes.itemGroupList),
               ),              HomeCard(
                 title: "Configurações",
                 icon: Icons.settings_outlined,
                 iconColor: Colors.grey[700],
-                onTap: () => _showTodoSnackbar(context, "Configurações"), // Feature not implemented yet
+                onTap: () => Navigator.pushNamed(context, AppRoutes.settings),
               ),
             ],
           ),

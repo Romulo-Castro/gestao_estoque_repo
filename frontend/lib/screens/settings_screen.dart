@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '/providers/auth_provider.dart';
 import '/providers/store_provider.dart';
+import '/providers/layout_provider.dart';
 import '/utils/app_prefs.dart';
 import '/widgets/app_drawer.dart';
 
@@ -272,6 +273,134 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   
                   const SizedBox(height: 16),
                   
+                  // Seção de Layout
+                  Consumer<LayoutProvider>(
+                    builder: (context, layoutProvider, child) {
+                      return Card(
+                        elevation: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Preferências de Layout',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                              const Divider(),
+                              ListTile(
+                                title: const Text('Layout do Estoque'),
+                                subtitle: Text(layoutProvider.stockLayoutType.displayName),
+                                trailing: DropdownButton<LayoutType>(
+                                  value: layoutProvider.stockLayoutType,
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  onChanged: (LayoutType? newValue) {
+                                    if (newValue != null) {
+                                      layoutProvider.setStockLayoutType(newValue);
+                                    }
+                                  },
+                                  items: LayoutType.values.map<DropdownMenuItem<LayoutType>>((LayoutType value) {
+                                    return DropdownMenuItem<LayoutType>(
+                                      value: value,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(value.icon, size: 16),
+                                          const SizedBox(width: 8),
+                                          Text(value.displayName),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                              ListTile(
+                                title: const Text('Layout dos Documentos'),
+                                subtitle: Text(layoutProvider.documentLayoutType.displayName),
+                                trailing: DropdownButton<LayoutType>(
+                                  value: layoutProvider.documentLayoutType,
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  onChanged: (LayoutType? newValue) {
+                                    if (newValue != null) {
+                                      layoutProvider.setDocumentLayoutType(newValue);
+                                    }
+                                  },
+                                  items: LayoutType.values.map<DropdownMenuItem<LayoutType>>((LayoutType value) {
+                                    return DropdownMenuItem<LayoutType>(
+                                      value: value,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(value.icon, size: 16),
+                                          const SizedBox(width: 8),
+                                          Text(value.displayName),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                              ListTile(
+                                title: const Text('Layout dos Clientes'),
+                                subtitle: Text(layoutProvider.customerLayoutType.displayName),
+                                trailing: DropdownButton<LayoutType>(
+                                  value: layoutProvider.customerLayoutType,
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  onChanged: (LayoutType? newValue) {
+                                    if (newValue != null) {
+                                      layoutProvider.setCustomerLayoutType(newValue);
+                                    }
+                                  },
+                                  items: LayoutType.values.map<DropdownMenuItem<LayoutType>>((LayoutType value) {
+                                    return DropdownMenuItem<LayoutType>(
+                                      value: value,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(value.icon, size: 16),
+                                          const SizedBox(width: 8),
+                                          Text(value.displayName),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                              ListTile(
+                                title: const Text('Layout dos Fornecedores'),
+                                subtitle: Text(layoutProvider.supplierLayoutType.displayName),
+                                trailing: DropdownButton<LayoutType>(
+                                  value: layoutProvider.supplierLayoutType,
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  onChanged: (LayoutType? newValue) {
+                                    if (newValue != null) {
+                                      layoutProvider.setSupplierLayoutType(newValue);
+                                    }
+                                  },
+                                  items: LayoutType.values.map<DropdownMenuItem<LayoutType>>((LayoutType value) {
+                                    return DropdownMenuItem<LayoutType>(
+                                      value: value,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(value.icon, size: 16),
+                                          const SizedBox(width: 8),
+                                          Text(value.displayName),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
                   // Seção de Dados
                   Card(
                     elevation: 2,
@@ -357,6 +486,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   content: Text('Política de privacidade será implementada em breve!'),
                                 ),
                               );
+                            },
+                          ),
+                          ListTile(
+                            title: const Text('Informações do App'),
+                            subtitle: const Text('Dados técnicos e diagnóstico'),
+                            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                            onTap: () {
+                              Navigator.pushNamed(context, '/app-info');
                             },
                           ),
                         ],

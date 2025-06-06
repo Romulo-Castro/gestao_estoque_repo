@@ -1,54 +1,58 @@
 // src/controllers/documentController.js
 const db = require("../data/database");
 
+// Import centralized error handling utilities
+const { 
+    catchAsync, 
+    validateId, 
+    notFound, 
+    AppError,
+    sendSuccessResponse 
+} = require('../utils/errorHandler');
+
 // GET /api/stores/:storeId/documents - Listar documentos da loja
-exports.getAllDocuments = async (req, res, next) => {
-    const storeId = parseInt(req.params.storeId, 10);
+exports.getAllDocuments = catchAsync(async (req, res, next) => {
+    const storeId = validateId(req.params.storeId, 'ID da loja');
+    
     // TODO: Adicionar filtros (tipo, data, cliente/fornecedor) via query params
-    try {
-        const documents = await db.findDocumentsByStore(storeId);
-        res.status(200).json(documents);
-    } catch (error) {
-        console.error(`[DocumentCtrl] Erro em getAllDocuments para loja ${storeId}:`, error);
-        next(error);
-    }
-};
+    const documents = await db.findDocumentsByStore(storeId);
+    sendSuccessResponse(res, documents, 'Documentos carregados com sucesso');
+});
 
 // GET /api/stores/:storeId/documents/:documentId - Obter documento por ID com itens
-exports.getDocumentById = async (req, res, next) => {
-    const storeId = parseInt(req.params.storeId, 10);
-    const documentId = parseInt(req.params.documentId, 10);
-    if (isNaN(documentId)) return res.status(400).json({ message: "ID do documento inválido." });
+exports.getDocumentById = catchAsync(async (req, res, next) => {
+    const storeId = validateId(req.params.storeId, 'ID da loja');
+    const documentId = validateId(req.params.documentId, 'ID do documento');
 
-    try {
-        const document = await db.findDocumentByIdAndStore(documentId, storeId);
-        if (!document) {
-            return res.status(404).json({ message: "Documento não encontrado nesta loja." });
-        }
-        const items = await db.findDocumentItemsByDocumentId(documentId);
-        res.status(200).json({ ...document, items });
-    } catch (error) {
-        console.error(`[DocumentCtrl] Erro em getDocumentById (Doc: ${documentId}, Loja: ${storeId}):`, error);
-        next(error);
+    const document = await db.findDocumentByIdAndStore(documentId, storeId);
+    if (!document) {
+        return notFound('Documento nesta loja');
     }
-};
+    
+    const items = await db.findDocumentItemsByDocumentId(documentId);
+    const documentWithItems = { ...document, items };
+    
+    sendSuccessResponse(res, documentWithItems, 'Documento encontrado com sucesso');
+});
 
 // POST /api/stores/:storeId/documents - Criar novo documento com itens
-exports.createDocument = async (req, res, next) => {
-    const storeId = parseInt(req.params.storeId, 10);
+exports.createDocument = catchAsync(async (req, res, next) => {
+    const storeId = validateId(req.params.storeId, 'ID da loja');
     const { type, document_date, customerId, supplierId, notes, items, total_amount } = req.body;
 
     // Validações básicas - aceita tipos em inglês conforme o banco de dados
     if (!["sale", "purchase", "adjustment_in", "adjustment_out"].includes(type)) {
-        return res.status(400).json({ message: "Tipo de documento inválido. Use: sale, purchase, adjustment_in ou adjustment_out" });
+        throw new AppError('Tipo de documento inválido. Use: sale, purchase, adjustment_in ou adjustment_out', 400);
     }
+    
     if (!document_date) {
-        return res.status(400).json({ message: "Data do documento é obrigatória." });
+        throw new AppError('Data do documento é obrigatória.', 400);
     }
+    
     if (!items || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ message: "Documento deve ter pelo menos um item." });
+        throw new AppError('Documento deve ter pelo menos um item.', 400);
     }
-    // TODO: Validar estrutura dos itens (itemId, quantity, price)
+
     // TODO: Validar se customerId/supplierId existem na loja, se fornecidos
 
     try {
@@ -73,7 +77,7 @@ exports.createDocument = async (req, res, next) => {
             const itemQuantity = item.quantity;
             
             if (!itemId || !itemQuantity || itemQuantity <= 0) {
-                throw new Error("Item inválido no documento: ID e quantidade positiva são obrigatórios.");
+                throw new AppError('Item inválido no documento: ID e quantidade positiva são obrigatórios.', 400);
             }
             // TODO: Validar se itemId existe na loja
 
@@ -95,62 +99,53 @@ exports.createDocument = async (req, res, next) => {
         // Retornar o documento criado com os itens
         const newDocument = await db.findDocumentByIdAndStore(documentId, storeId);
         const newItems = await db.findDocumentItemsByDocumentId(documentId);
-        res.status(201).json({ ...newDocument, items: newItems });
+        const documentWithItems = { ...newDocument, items: newItems };
+        
+        sendSuccessResponse(res, documentWithItems, 'Documento criado com sucesso', 201);
 
     } catch (error) {
         await db.rollbackTransaction();
-        console.error(`[DocumentCtrl] Erro em createDocument para loja ${storeId}:`, error);
-        next(error);
+        throw error;
     }
-};
+});
 
 // PUT /api/stores/:storeId/documents/:documentId - Atualizar documento (cabeçalho apenas?)
 // **NOTA:** Atualizar itens de um documento finalizado geralmente não é permitido.
 // A edição pode ser limitada a campos como 'notes' ou status (se houver).
 // Uma abordagem mais segura seria CANCELAR o documento e criar um novo.
 // Por simplicidade, vamos permitir atualizar apenas 'notes', 'date', 'customerId', 'supplierId'.
-exports.updateDocumentHeader = async (req, res, next) => {
-    const storeId = parseInt(req.params.storeId, 10);
-    const documentId = parseInt(req.params.documentId, 10);
+exports.updateDocumentHeader = catchAsync(async (req, res, next) => {
+    const storeId = validateId(req.params.storeId, 'ID da loja');
+    const documentId = validateId(req.params.documentId, 'ID do documento');
     const { date, customerId, supplierId, notes } = req.body;
 
-    if (isNaN(documentId)) return res.status(400).json({ message: "ID do documento inválido." });
-
-    try {
-        const existingDoc = await db.findDocumentByIdAndStore(documentId, storeId);
-        if (!existingDoc) {
-            return res.status(404).json({ message: "Documento não encontrado nesta loja." });
-        }
-        // TODO: Adicionar lógica para impedir edição se o documento estiver "fechado" ou "processado"
-
-        const result = await db.updateDocumentHeaderDetails(documentId, storeId, {
-            date: date || existingDoc.date, // Manter data se não fornecida
-            customerId: customerId === undefined ? existingDoc.customer_id : customerId, // Permite setar para null
-            supplierId: supplierId === undefined ? existingDoc.supplier_id : supplierId, // Permite setar para null
-            notes: notes === undefined ? existingDoc.notes : notes?.trim() || null,
-        });
-
-        if (result.changes === 0) {
-            return res.status(304).end(); // Not Modified
-        }
-
-        const updatedDocument = await db.findDocumentByIdAndStore(documentId, storeId);
-        const items = await db.findDocumentItemsByDocumentId(documentId); // Itens não mudam aqui
-        res.status(200).json({ ...updatedDocument, items });
-
-    } catch (error) {
-        console.error(`[DocumentCtrl] Erro em updateDocumentHeader (Doc: ${documentId}, Loja: ${storeId}):`, error);
-        next(error);
+    const existingDoc = await db.findDocumentByIdAndStore(documentId, storeId);
+    if (!existingDoc) {
+        return notFound('Documento nesta loja');
     }
-};
+    
+    // TODO: Adicionar lógica para impedir edição se o documento estiver "fechado" ou "processado"
+
+    const result = await db.updateDocumentHeaderDetails(documentId, storeId, {
+        date: date || existingDoc.date, // Manter data se não fornecida
+        customerId: customerId === undefined ? existingDoc.customer_id : customerId, // Permite setar para null
+        supplierId: supplierId === undefined ? existingDoc.supplier_id : supplierId, // Permite setar para null
+        notes: notes === undefined ? existingDoc.notes : notes?.trim() || null,
+    });
+
+    const updatedDocument = await db.findDocumentByIdAndStore(documentId, storeId);
+    const items = await db.findDocumentItemsByDocumentId(documentId); // Itens não mudam aqui
+    const documentWithItems = { ...updatedDocument, items };
+    
+    sendSuccessResponse(res, documentWithItems, 'Documento atualizado com sucesso');
+});
 
 // DELETE /api/stores/:storeId/documents/:documentId - Deletar/Cancelar documento
 // **NOTA:** A exclusão física pode ser perigosa. Uma abordagem melhor é "cancelar" o documento.
 // Cancelar envolveria REVERTER os ajustes de estoque feitos pelo documento original.
-exports.cancelDocument = async (req, res, next) => {
-    const storeId = parseInt(req.params.storeId, 10);
-    const documentId = parseInt(req.params.documentId, 10);
-    if (isNaN(documentId)) return res.status(400).json({ message: "ID do documento inválido." });
+exports.cancelDocument = catchAsync(async (req, res, next) => {
+    const storeId = validateId(req.params.storeId, 'ID da loja');
+    const documentId = validateId(req.params.documentId, 'ID do documento');
 
     try {
         await db.beginTransaction();
@@ -158,11 +153,12 @@ exports.cancelDocument = async (req, res, next) => {
         const document = await db.findDocumentByIdAndStore(documentId, storeId);
         if (!document) {
             await db.rollbackTransaction();
-            return res.status(404).json({ message: "Documento não encontrado nesta loja." });
+            return notFound('Documento nesta loja');
         }
+        
         if (document.status === "CANCELADO") { // Assumindo um campo status
-             await db.rollbackTransaction();
-             return res.status(400).json({ message: "Documento já está cancelado." });
+            await db.rollbackTransaction();
+            throw new AppError('Documento já está cancelado.', 400);
         }
 
         // 1. Buscar os itens do documento para saber o que reverter
@@ -173,7 +169,7 @@ exports.cancelDocument = async (req, res, next) => {
             // A quantidade a reverter é o OPOSTO do ajuste original
             const quantityToReverse = (document.type === "ENTRADA" || document.type === "AJUSTE_ENTRADA") ? -item.quantity : item.quantity;
             await db.updateStockQuantity(item.item_id, storeId, quantityToReverse);
-             // TODO: Verificar se estoque ficou negativo se a regra de negócio exigir
+            // TODO: Verificar se estoque ficou negativo se a regra de negócio exigir
         }
 
         // 3. Marcar o documento como cancelado (ou deletar, se preferir - menos seguro)
@@ -182,13 +178,11 @@ exports.cancelDocument = async (req, res, next) => {
 
         await db.commitTransaction();
 
-        // res.status(200).json({ message: "Documento excluído com sucesso." }); // Se deletou
-        res.status(200).json({ message: "Documento cancelado com sucesso." }); // Se marcou
+        sendSuccessResponse(res, null, 'Documento cancelado com sucesso');
 
     } catch (error) {
         await db.rollbackTransaction();
-        console.error(`[DocumentCtrl] Erro em cancelDocument (Doc: ${documentId}, Loja: ${storeId}):`, error);
-        next(error);
+        throw error;
     }
-};
+});
 

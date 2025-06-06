@@ -4,15 +4,13 @@ import 'package:provider/provider.dart';
 import '../main.dart'; // Para AppRoutes
 import '../providers/auth_provider.dart';
 import '../providers/store_provider.dart';
+import '../utils/error_handler.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
   // Helper para mostrar snackbar de funcionalidades não implementadas
   void _showTodoSnackbar(BuildContext context, String featureName) {
-    ScaffoldMessenger.of(context).removeCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("$featureName ainda não implementado."), duration: const Duration(seconds: 2))
-    );
+    ErrorHandler.showErrorSnackBar(context, "$featureName ainda não implementado.");
   }
 
   @override
@@ -67,9 +65,7 @@ class AppDrawer extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               if (storeProvider.selectedStoreId == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Selecione uma loja primeiro."))
-                );
+                ErrorHandler.showErrorSnackBar(context, "Selecione uma loja primeiro.");
                 return;
               }
               Navigator.pushNamed(context, AppRoutes.stockList);
@@ -81,9 +77,7 @@ class AppDrawer extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               if (storeProvider.selectedStoreId == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Selecione uma loja primeiro."))
-                );
+                ErrorHandler.showErrorSnackBar(context, "Selecione uma loja primeiro.");
                 return;
               }
               Navigator.pushNamed(context, AppRoutes.documentList);
@@ -111,9 +105,7 @@ class AppDrawer extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               if (storeProvider.selectedStoreId == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Selecione uma loja primeiro."))
-                );
+                ErrorHandler.showErrorSnackBar(context, "Selecione uma loja primeiro.");
                 return;
               }
               Navigator.pushNamed(context, AppRoutes.itemGroupList);
@@ -125,9 +117,7 @@ class AppDrawer extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               if (storeProvider.selectedStoreId == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Selecione uma loja primeiro."))
-                );
+                ErrorHandler.showErrorSnackBar(context, "Selecione uma loja primeiro.");
                 return;
               }
               Navigator.pushNamed(context, AppRoutes.supplierList);
@@ -139,9 +129,7 @@ class AppDrawer extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               if (storeProvider.selectedStoreId == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Selecione uma loja primeiro."))
-                );
+                ErrorHandler.showErrorSnackBar(context, "Selecione uma loja primeiro.");
                 return;
               }
               Navigator.pushNamed(context, AppRoutes.customerList);

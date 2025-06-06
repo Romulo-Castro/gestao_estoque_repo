@@ -24,18 +24,17 @@ class Customer {
     required this.createdAt,
     required this.updatedAt,
   });
-
   factory Customer.fromJson(Map<String, dynamic> json) {
     return Customer(
       id: json['id'] as int,
       storeId: json['store_id'] as int,
-      name: json['name'] as String,
-      email: json['email'] as String?,
-      phone: json['phone'] as String?,
-      address: json['address'] as String?,
-      notes: json['notes'] as String?,
-      createdAt: json['created_at'] as String,
-      updatedAt: json['updated_at'] as String,
+      name: json['name'] as String? ?? '',
+      email: json['email'] != null ? json['email'] as String : null,
+      phone: json['phone'] != null ? json['phone'] as String : null,
+      address: json['address'] != null ? json['address'] as String : null,
+      notes: json['notes'] != null ? json['notes'] as String : null,
+      createdAt: json['created_at'] as String? ?? '',
+      updatedAt: json['updated_at'] as String? ?? '',
     );
   }
 

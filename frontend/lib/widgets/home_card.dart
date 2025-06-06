@@ -7,6 +7,8 @@ class HomeCard extends StatelessWidget {
   final VoidCallback? onTap;
   final String? subtitle; // Opcional: para mostrar contagem, etc.
   final Color? iconColor; // Opcional: Cor do ícone
+  final int? count; // Contador para exibir abaixo do título
+  final bool isLoading; // Para mostrar loading no contador
 
   const HomeCard({
     super.key,
@@ -15,6 +17,8 @@ class HomeCard extends StatelessWidget {
     this.onTap,
     this.subtitle,
     this.iconColor,
+    this.count,
+    this.isLoading = false,
   });
 
   @override
@@ -49,8 +53,33 @@ class HomeCard extends StatelessWidget {
                 style: theme.textTheme.titleMedium?.copyWith(
                   // Ajusta cor do texto baseado no fundo do card
                   color: theme.brightness == Brightness.dark ? Colors.white : Colors.black87
-                ),
-              ),
+                ),              ),
+              if (count != null) ...[
+                const SizedBox(height: 8.0),
+                isLoading
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: iconColor ?? colorScheme.primary,
+                        ),
+                      )
+                    : Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: (iconColor ?? colorScheme.primary).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          count.toString(),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: iconColor ?? colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+              ],
               if (subtitle != null && subtitle!.isNotEmpty) ...[
                  const SizedBox(height: 4.0),
                  Text(

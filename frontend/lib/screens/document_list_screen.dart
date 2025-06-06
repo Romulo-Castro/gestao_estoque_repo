@@ -5,9 +5,11 @@ import "package:provider/provider.dart";
 import "/models/document_model.dart";
 import "/providers/document_provider.dart";
 import "/providers/store_provider.dart";
+import "/providers/layout_provider.dart";
 import "/screens/edit_document_screen.dart"; // Para criar novo
 import "/screens/document_detail_screen.dart"; // Para ver detalhes
 import "/widgets/app_drawer.dart";
+import "/utils/error_handler.dart";
 
 class DocumentListScreen extends StatefulWidget {
   const DocumentListScreen({super.key});
@@ -301,10 +303,17 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
+    return Scaffold(      appBar: AppBar(
         title: const Text("Documentos"),
         actions: [
+          // Layout toggle button
+          Consumer<LayoutProvider>(
+            builder: (ctx, layoutProvider, _) => IconButton(
+              icon: Icon(layoutProvider.documentLayoutType.icon),
+              tooltip: "Alterar layout: ${layoutProvider.documentLayoutType.displayName}",
+              onPressed: () => layoutProvider.toggleDocumentLayout(),
+            ),
+          ),
           // Botão de filtro implementado
           IconButton(
             icon: const Icon(Icons.filter_list),
@@ -345,65 +354,10 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
             return const Center(
               child: Text("Nenhum documento encontrado."),
             );
-          }
-
-          // Lista de documentos - Corrigido o uso desnecessário de toList() em spread
-          return ListView.builder(
-            itemCount: docProvider.documents.length,
-            itemBuilder: (ctx, index) {
-              final doc = docProvider.documents[index];
-              final formattedDate = DateFormat("dd/MM/yyyy").format(DateTime.parse(doc.date));
-              final color = _getDocColor(doc.type, doc.status);
-
-              return ListTile(
-                leading: Icon(_getDocIcon(doc.type), color: color),
-                title: Text("#${doc.id} - ${documentTypeToString(doc.type)}"),
-                subtitle: Text("Data: $formattedDate - ${doc.status}"),
-                trailing: doc.status == "CANCELADO"
-                    ? const Icon(Icons.cancel, color: Colors.grey)
-                    : IconButton(
-                        icon: const Icon(Icons.delete_forever, color: Colors.red),
-                        tooltip: "Cancelar Documento",
-                        onPressed: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text("Confirmar Cancelamento"),
-                              content: Text("Tem certeza que deseja cancelar o documento #${doc.id}? Isso reverterá os movimentos de estoque associados."),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text("Não")),
-                                TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text("Sim, Cancelar", style: TextStyle(color: Colors.red))),
-                              ],
-                            ),
-                          );
-                          if (confirm == true) {
-                            try {
-                              await docProvider.cancelDocument(doc.id);
-                              // Corrigido o uso de BuildContext após operação assíncrona
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text("Documento cancelado!"), backgroundColor: Colors.green),
-                                );
-                              }
-                            } catch (e) {
-                              // Corrigido o uso de BuildContext após operação assíncrona
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text("Erro ao cancelar: $e"), backgroundColor: Colors.red),
-                                );
-                              }
-                            }
-                          }
-                        },
-                      ),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (ctx) => DocumentDetailScreen(documentId: int.parse(doc.id)), // Convert string ID to int
-                    ),
-                  );
-                },
-              );
+          }          // Layout-based document display
+          return Consumer<LayoutProvider>(
+            builder: (context, layoutProvider, child) {
+              return _buildLayoutBasedView(docProvider, layoutProvider.documentLayoutType);
             },
           );
         },
@@ -419,5 +373,202 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
         },
       ),
     );
+  }
+
+  // Layout-based view methods
+  Widget _buildLayoutBasedView(DocumentProvider docProvider, LayoutType layoutType) {
+    switch (layoutType) {
+      case LayoutType.list:
+        return _buildListView(docProvider);
+      case LayoutType.grid:
+        return _buildGridView(docProvider);
+      case LayoutType.card:
+        return _buildCardView(docProvider);
+    }
+  }
+
+  Widget _buildListView(DocumentProvider docProvider) {
+    return ListView.builder(
+      itemCount: docProvider.documents.length,
+      itemBuilder: (ctx, index) {
+        final doc = docProvider.documents[index];
+        return _buildDocumentListTile(doc);
+      },
+    );
+  }
+
+  Widget _buildGridView(DocumentProvider docProvider) {
+    return GridView.builder(
+      padding: const EdgeInsets.all(8.0),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.8,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: docProvider.documents.length,
+      itemBuilder: (ctx, index) {
+        final doc = docProvider.documents[index];
+        return _buildDocumentGridCard(doc);
+      },
+    );
+  }
+
+  Widget _buildCardView(DocumentProvider docProvider) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(8.0),
+      itemCount: docProvider.documents.length,
+      itemBuilder: (ctx, index) {
+        final doc = docProvider.documents[index];
+        return _buildDocumentCard(doc);
+      },
+    );
+  }
+  Widget _buildDocumentListTile(Document doc) {
+    final formattedDate = doc.date.isNotEmpty 
+        ? DateFormat("dd/MM/yyyy").format(DateTime.parse(doc.date))
+        : "Data inválida";
+    final color = _getDocColor(doc.type, doc.status);
+
+    return ListTile(
+      leading: Icon(_getDocIcon(doc.type), color: color),
+      title: Text("#${doc.id} - ${documentTypeToString(doc.type)}"),
+      subtitle: Text("Data: $formattedDate - ${doc.status}"),
+      trailing: _buildDocumentTrailingAction(doc),
+      onTap: () => _navigateToDocumentDetail(doc),
+    );
+  }
+  Widget _buildDocumentGridCard(Document doc) {
+    final formattedDate = doc.date.isNotEmpty 
+        ? DateFormat("dd/MM/yyyy").format(DateTime.parse(doc.date))
+        : "Data inválida";
+    final color = _getDocColor(doc.type, doc.status);
+
+    return Card(
+      child: InkWell(
+        onTap: () => _navigateToDocumentDetail(doc),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(_getDocIcon(doc.type), color: color, size: 40),
+              const SizedBox(height: 8),
+              Text(
+                "#${doc.id}",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              Text(
+                documentTypeToString(doc.type),
+                style: const TextStyle(fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                formattedDate,
+                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+              Text(
+                doc.status,
+                style: TextStyle(fontSize: 10, color: color),
+                textAlign: TextAlign.center,
+              ),
+              const Spacer(),
+              _buildDocumentTrailingAction(doc),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  Widget _buildDocumentCard(Document doc) {
+    final formattedDate = doc.date.isNotEmpty 
+        ? DateFormat("dd/MM/yyyy").format(DateTime.parse(doc.date))
+        : "Data inválida";
+    final color = _getDocColor(doc.type, doc.status);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0),
+      child: InkWell(
+        onTap: () => _navigateToDocumentDetail(doc),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Icon(_getDocIcon(doc.type), color: color, size: 48),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "#${doc.id} - ${documentTypeToString(doc.type)}",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text("Data: $formattedDate"),
+                    Text(
+                      "Status: ${doc.status}",
+                      style: TextStyle(color: color),
+                    ),
+                  ],
+                ),
+              ),
+              _buildDocumentTrailingAction(doc),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDocumentTrailingAction(Document doc) {
+    return doc.status == "CANCELADO"
+        ? const Icon(Icons.cancel, color: Colors.grey)
+        : IconButton(
+            icon: const Icon(Icons.delete_forever, color: Colors.red),
+            tooltip: "Cancelar Documento",
+            onPressed: () => _confirmCancelDocument(doc),
+          );
+  }
+
+  void _navigateToDocumentDetail(Document doc) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => DocumentDetailScreen(documentId: int.parse(doc.id)),
+      ),
+    );
+  }
+
+  Future<void> _confirmCancelDocument(Document doc) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Confirmar Cancelamento"),
+        content: Text("Tem certeza que deseja cancelar o documento #${doc.id}? Isso reverterá os movimentos de estoque associados."),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text("Não")),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text("Sim, Cancelar", style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    
+    if (confirm == true) {
+      try {
+        final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+        await docProvider.cancelDocument(int.parse(doc.id));
+        if (mounted) {
+          ErrorHandler.showSuccessSnackBar(context, "Documento cancelado!");
+        }
+      } catch (e) {      if (mounted) {
+          ErrorHandler.showErrorSnackBar(context, "Erro ao cancelar: $e");
+        }
+      }
+    }
   }
 }

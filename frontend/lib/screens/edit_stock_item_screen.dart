@@ -10,6 +10,7 @@ import "/providers/item_group_provider.dart"; // Importar provider de grupo
 // Para obter storeId
 import "/services/api_service.dart";
 import "/utils/app_prefs.dart";
+import "/utils/error_handler.dart";
 import "package:image_picker/image_picker.dart";
 import '../widgets/barcode_scanner_page.dart';
 import 'package:file_picker/file_picker.dart';
@@ -337,16 +338,15 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
 
     if (confirmed && mounted) {
       setState(() => _isLoading = true);
-      final scaffoldMessenger = ScaffoldMessenger.of(context);
-      scaffoldMessenger.showSnackBar(const SnackBar(content: Text("Excluindo item..."), duration: Duration(seconds: 5)));
+      ErrorHandler.showLoadingSnackBar(context, "Excluindo item...");
       try {
         await _apiService.deleteStockItem(widget.storeId, widget.initialItem!.id);
-        scaffoldMessenger.removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
         if (mounted) {
           Navigator.pop(context, true); // Sinaliza sucesso
         }
       } catch (e) {
-        scaffoldMessenger.removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
         if (mounted) {
           _showErrorSnackbar("Erro ao excluir item: $e");
         }
@@ -360,14 +360,12 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
 
   void _showErrorSnackbar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).removeCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Theme.of(context).colorScheme.error));
+    ErrorHandler.showErrorSnackBar(context, message);
   }
 
   void _showInfoSnackbar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).removeCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ErrorHandler.showSuccessSnackBar(context, message);
   }
 
   /// Navega para a página de scanner e obtém o código lido
@@ -448,25 +446,49 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
                       Center(
                         child: GestureDetector(
                           onTap: _isLoading ? null : () => _showImageSourceActionSheet(context),
-                          child: CircleAvatar(
-                            radius: 60,
-                            backgroundColor: Colors.grey[200],
-                            backgroundImage: _getImageProvider(),
-                            onBackgroundImageError: (_selectedImageFile == null && _currentImageUrl != null && _currentImageUrl!.isNotEmpty)
-                                ? (exception, stackTrace) {
-                                    debugPrint("Erro ao carregar imagem de rede (Edit): $_currentImageUrl -> $exception");
-                                    // Limpar URL se houver erro
-                                    if (mounted) {
-                                      setState(() {
-                                        _currentImageUrl = null;
-                                      });
-                                    }
-                                  }
-                                : null,
-                            child: (_selectedImageFile == null && (_currentImageUrl == null || _currentImageUrl!.isEmpty))
-                                ? const Icon(Icons.add_a_photo, size: 40, color: Colors.grey)
-                                : null,
+                          child: Stack(
+                            children: [
+                              CircleAvatar(
+                                radius: 60,
+                                backgroundColor: Colors.grey[200],
+                                backgroundImage: _getImageProvider(),
+                                onBackgroundImageError: (_selectedImageFile == null && _currentImageUrl != null && _currentImageUrl!.isNotEmpty)
+                                    ? (exception, stackTrace) {
+                                        debugPrint("Erro ao carregar imagem de rede (Edit): $_currentImageUrl -> $exception");
+                                        // Limpar URL se houver erro
+                                        if (mounted) {
+                                          setState(() {
+                                            _currentImageUrl = null;
+                                          });
+                                        }
+                                      }
+                                    : null,
+                                child: (_selectedImageFile == null && (_currentImageUrl == null || _currentImageUrl!.isEmpty))
+                                    ? const Icon(Icons.add_a_photo, size: 40, color: Colors.grey)
+                                    : null,
+                              ),
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).primaryColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.add_a_photo, color: Colors.white, size: 20),
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.camera_alt),
+                          label: const Text("Adicionar Imagem"),
+                          onPressed: _isLoading ? null : () => _showImageSourceActionSheet(context),
                         ),
                       ),
                       const SizedBox(height: 16),

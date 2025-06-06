@@ -4,6 +4,7 @@ import "package:provider/provider.dart";
 import "/models/supplier_model.dart";
 import "/providers/supplier_provider.dart";
 import "/providers/store_provider.dart"; // Para obter o storeId
+import "/utils/error_handler.dart";
 
 class EditSupplierScreen extends StatefulWidget {
   final int? supplierId; // Null para adicionar, preenchido para editar
@@ -40,12 +41,9 @@ class _EditSupplierScreenState extends State<EditSupplierScreen> {
   Future<void> _loadSupplierData() async {
     setState(() {
       _isLoading = true;
-    });
-    final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
+    });    final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
     if (storeId == null) {
-       ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text("Erro: Loja não selecionada."), backgroundColor: Colors.red),
-       );
+       ErrorHandler.showErrorSnackBar(context, "Erro: Loja não selecionada.");
        setState(() { _isLoading = false; });
        Navigator.of(context).pop(); // Volta se não tem loja
        return;
@@ -61,9 +59,7 @@ class _EditSupplierScreenState extends State<EditSupplierScreen> {
       _addressController.text = _initialSupplierData!.address ?? "";
       _notesController.text = _initialSupplierData!.notes ?? "";
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erro ao carregar fornecedor: $e"), backgroundColor: Colors.red),
-      );
+      ErrorHandler.showErrorSnackBar(context, "Erro ao carregar fornecedor: $e");
     } finally {
       setState(() {
         _isLoading = false;
@@ -106,11 +102,8 @@ class _EditSupplierScreenState extends State<EditSupplierScreen> {
           notes: _notesController.text.isEmpty ? null : _notesController.text,
           createdAt: "",
           updatedAt: "",
-        );
-        await supplierProvider.createSupplier(supplier);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Fornecedor criado com sucesso!"), backgroundColor: Colors.green),
-        );
+        );        await supplierProvider.createSupplier(supplier);
+        ErrorHandler.showSuccessSnackBar(context, "Fornecedor criado com sucesso!");
       } else {
         // Atualizar fornecedor existente
         final supplier = Supplier(
@@ -125,15 +118,11 @@ class _EditSupplierScreenState extends State<EditSupplierScreen> {
           updatedAt: _initialSupplierData!.updatedAt,
         );
         await supplierProvider.updateSupplier(widget.supplierId!, supplier);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Fornecedor atualizado com sucesso!"), backgroundColor: Colors.green),
-        );
+        ErrorHandler.showSuccessSnackBar(context, "Fornecedor atualizado com sucesso!");
       }
       Navigator.of(context).pop();
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erro ao salvar fornecedor: $error"), backgroundColor: Colors.red),
-      );
+      ErrorHandler.showErrorSnackBar(context, "Erro ao salvar fornecedor: $error");
     } finally {
       if (mounted) {
          setState(() {

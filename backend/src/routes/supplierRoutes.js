@@ -1,7 +1,7 @@
 // src/routes/supplierRoutes.js
 const express = require("express");
 const supplierController = require("../controllers/supplierController");
-// const { validateSupplier, handleValidationErrors } = require("../middleware/validators"); // TODO: Criar validações se necessário
+const { validateSupplier, validateIdParam, handleValidationErrors } = require("../middleware/validators");
 
 // Usar mergeParams para acessar :storeId da rota pai (storeRoutes)
 const router = express.Router({ mergeParams: true });
@@ -10,10 +10,27 @@ const router = express.Router({ mergeParams: true });
 
 // Rotas para Fornecedores dentro de uma Loja
 router.get("/", supplierController.getAllSuppliers);
-router.post("/", /* validateSupplier(), handleValidationErrors, */ supplierController.createSupplier);
-router.get("/:supplierId", supplierController.getSupplierById);
-router.put("/:supplierId", /* validateSupplier(), handleValidationErrors, */ supplierController.updateSupplier);
-router.delete("/:supplierId", supplierController.deleteSupplier);
+router.post("/", 
+    validateSupplier(), 
+    handleValidationErrors, 
+    supplierController.createSupplier
+);
+router.get("/:supplierId", 
+    validateIdParam('supplierId'),
+    handleValidationErrors,
+    supplierController.getSupplierById
+);
+router.put("/:supplierId", 
+    validateIdParam('supplierId'),
+    validateSupplier(), 
+    handleValidationErrors, 
+    supplierController.updateSupplier
+);
+router.delete("/:supplierId", 
+    validateIdParam('supplierId'),
+    handleValidationErrors,
+    supplierController.deleteSupplier
+);
 
 module.exports = router;
 

@@ -1,0 +1,6 @@
+Nome,Quantidade,Código de Barras,Categoria,Descrição,Preço de Custo,Preço de Venda,Unidade,Fornecedor,Localização,Observações
+Arroz Tipo 1,100,1234567890123,Alimentos,Arroz branco tipo 1 kg,2.50,4.00,KG,Fornecedor ABC,Estoque A,Produto premium
+Feijão Preto,50,9876543210987,Alimentos,Feijão preto premium 1kg,3.00,5.50,KG,Fornecedor XYZ,Estoque A,Grão selecionado
+Açúcar Cristal,75,,Alimentos,Açúcar cristal refinado 1kg,1.80,3.20,KG,Fornecedor ABC,Estoque B,
+Óleo de Soja,30,5555666677778,Alimentos,Óleo de soja refinado 900ml,4.50,7.90,LT,Fornecedor DEF,Estoque A,Embalagem 900ml
+Macarrão Espaguete,25,1111222233334,Alimentos,Macarrão espaguete premium 500g,1.20,2.80,PCT,Fornecedor ABC,Estoque B,Pacote 500g

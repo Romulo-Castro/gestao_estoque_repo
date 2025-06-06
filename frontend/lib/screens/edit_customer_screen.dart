@@ -4,6 +4,7 @@ import "package:provider/provider.dart";
 import "/models/customer_model.dart";
 import "/providers/customer_provider.dart";
 import "/providers/store_provider.dart"; // Para obter o storeId
+import "/utils/error_handler.dart";
 
 class EditCustomerScreen extends StatefulWidget {
   final int? customerId; // Null para adicionar, preenchido para editar
@@ -41,11 +42,8 @@ class _EditCustomerScreenState extends State<EditCustomerScreen> {
     setState(() {
       _isLoading = true;
     });
-    final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
-    if (storeId == null) {
-       ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text("Erro: Loja não selecionada."), backgroundColor: Colors.red),
-       );
+    final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;    if (storeId == null) {
+       ErrorHandler.showErrorSnackBar(context, "Erro: Loja não selecionada.");
        setState(() { _isLoading = false; });
        Navigator.of(context).pop(); // Volta se não tem loja
        return;
@@ -59,11 +57,8 @@ class _EditCustomerScreenState extends State<EditCustomerScreen> {
       _emailController.text = _initialCustomerData!.email ?? "";
       _phoneController.text = _initialCustomerData!.phone ?? "";
       _addressController.text = _initialCustomerData!.address ?? "";
-      _notesController.text = _initialCustomerData!.notes ?? "";
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erro ao carregar cliente: $e"), backgroundColor: Colors.red),
-      );
+      _notesController.text = _initialCustomerData!.notes ?? "";    } catch (e) {
+      ErrorHandler.showErrorSnackBar(context, "Erro ao carregar cliente: $e");
     } finally {
       setState(() {
         _isLoading = false;
@@ -106,11 +101,8 @@ class _EditCustomerScreenState extends State<EditCustomerScreen> {
           notes: _notesController.text.isEmpty ? null : _notesController.text,
           createdAt: "",
           updatedAt: "",
-        );
-        await customerProvider.createCustomer(customer);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Cliente criado com sucesso!"), backgroundColor: Colors.green),
-        );
+        );        await customerProvider.createCustomer(customer);
+        ErrorHandler.showSuccessSnackBar(context, "Cliente criado com sucesso!");
       } else {
         // Atualizar cliente existente
         final customer = Customer(
@@ -123,17 +115,12 @@ class _EditCustomerScreenState extends State<EditCustomerScreen> {
           notes: _notesController.text.isEmpty ? null : _notesController.text,
           createdAt: _initialCustomerData!.createdAt,
           updatedAt: _initialCustomerData!.updatedAt,
-        );
-        await customerProvider.updateCustomer(widget.customerId!, customer);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Cliente atualizado com sucesso!"), backgroundColor: Colors.green),
-        );
+        );        await customerProvider.updateCustomer(widget.customerId!, customer);
+        ErrorHandler.showSuccessSnackBar(context, "Cliente atualizado com sucesso!");
       }
       Navigator.of(context).pop();
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erro ao salvar cliente: $error"), backgroundColor: Colors.red),
-      );
+      ErrorHandler.showErrorSnackBar(context, "Erro ao salvar cliente: $error");
     } finally {
       if (mounted) {
          setState(() {

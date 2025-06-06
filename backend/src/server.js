@@ -1,7 +1,7 @@
 // src/server.js
 
 // Carrega variáveis do .env O MAIS CEDO POSSÍVEL, especialmente se DB config depende delas
-require('dotenv').config({ path: require('path').resolve(__dirname, '/.env') }); // Garante que carrega da pasta backend
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }); // Garante que carrega da pasta backend
 
 const express = require('express');
 const cors = require('cors');
@@ -68,29 +68,11 @@ async function startServer() {
                  res.status(404).json({ message: 'Endpoint não encontrado.' });
             }
             // Não chamar next() aqui se for 404 definitivo
-        });
+        });        // Import the centralized error handler
+        const { globalErrorHandler } = require('./utils/errorHandler');
 
-        // Middleware Genérico de Tratamento de Erros
-        // Precisa ter 4 argumentos (err, req, res, next) para ser reconhecido como error handler
-        app.use((err, req, res, next) => {
-            if (res.headersSent) {
-                return next(err); // Delega se resposta já iniciou
-            }
-
-            console.error("ERRO CAPTURADO:", err.stack || err); // Log detalhado
-
-            // Tratamento específico para erros conhecidos (ex: Multer) pode ser feito aqui
-            // mas é melhor se o erro já vier tratado do controller/middleware anterior
-            // if (err instanceof multer.MulterError) { ... } // 'multer' precisaria ser importado aqui para isso
-
-            // Resposta de erro genérica
-            const statusCode = err.status || (err.code === 'SQLITE_CONSTRAINT' ? 400 : 500); // Tenta mapear erros de constraint para 400
-            res.status(statusCode).json({
-                message: err.message || 'Ocorreu um erro interno no servidor.',
-                // Opcional: incluir detalhes do erro em DEV
-                // error: process.env.NODE_ENV === 'development' ? { code: err.code, stack: err.stack } : undefined
-            });
-        });
+        // Use the centralized global error handler
+        app.use(globalErrorHandler);
 
         // === Iniciar o Servidor ===
         app.listen(PORT, () => {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '/models/store_model.dart';
 import '/providers/store_provider.dart';
+import '/utils/error_handler.dart';
 
 class EditStoreScreen extends StatefulWidget {
   final Store? initialStore;
@@ -50,18 +51,14 @@ class _EditStoreScreenState extends State<EditStoreScreen> {
         await storeProvider.updateStore(widget.initialStore!.id, name, address.isNotEmpty ? address : null); // Passa null se vazio
       } else {
         await storeProvider.createStore(name, address.isNotEmpty ? address : null); // Passa null se vazio
-      }
-
-      // ★★★ VERIFICAÇÃO mounted ANTES DE NAVEGAR ★★★
+      }      // ★★★ VERIFICAÇÃO mounted ANTES DE NAVEGAR ★★★
       if (mounted) {
         Navigator.pop(context, true); // Retorna true para indicar sucesso
       }
     } catch (e) {
       // ★★★ VERIFICAÇÃO mounted ANTES DE USAR context ★★★
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erro ao salvar loja: $e"), backgroundColor: Colors.red)
-        );
+        ErrorHandler.showErrorSnackBar(context, "Erro ao salvar loja: $e");
       }
     } finally {
        // ★★★ VERIFICAÇÃO mounted ANTES DE setState ★★★

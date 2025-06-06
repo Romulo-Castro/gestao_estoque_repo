@@ -4,6 +4,7 @@ import "package:provider/provider.dart";
 import "/models/item_group_model.dart";
 import "/providers/item_group_provider.dart";
 import "/providers/store_provider.dart"; // Para obter o storeId
+import "/utils/error_handler.dart";
 
 class EditItemGroupScreen extends StatefulWidget {
   final int? groupId; // Null para adicionar, preenchido para editar
@@ -38,11 +39,8 @@ class _EditItemGroupScreenState extends State<EditItemGroupScreen> {
     setState(() {
       _isLoading = true;
     });
-    final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
-    if (storeId == null) {
-       ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text("Erro: Loja não selecionada."), backgroundColor: Colors.red),
-       );
+    final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;    if (storeId == null) {
+       ErrorHandler.showErrorSnackBar(context, "Erro: Loja não selecionada.");
        setState(() { _isLoading = false; });
        Navigator.of(context).pop();
        return;
@@ -54,11 +52,8 @@ class _EditItemGroupScreenState extends State<EditItemGroupScreen> {
       _initialGroupData = provider.groups.firstWhere((g) => g.id == widget.groupId);
 
       _nameController.text = _initialGroupData!.name;
-      _descriptionController.text = _initialGroupData!.description ?? "";
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erro ao carregar grupo: $e"), backgroundColor: Colors.red),
-      );
+      _descriptionController.text = _initialGroupData!.description ?? "";    } catch (e) {
+      ErrorHandler.showErrorSnackBar(context, "Erro ao carregar grupo: $e");
     } finally {
       setState(() {
         _isLoading = false;
@@ -86,15 +81,12 @@ class _EditItemGroupScreenState extends State<EditItemGroupScreen> {
     final groupProvider = Provider.of<ItemGroupProvider>(context, listen: false);
 
     try {
-      if (widget.groupId == null) {
-        // Criar novo grupo
+      if (widget.groupId == null) {        // Criar novo grupo
         await groupProvider.createItemGroup(
           _nameController.text,
           description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
         );
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Grupo criado com sucesso!"), backgroundColor: Colors.green),
-        );
+        ErrorHandler.showSuccessSnackBar(context, "Grupo criado com sucesso!");
       } else {
         // Atualizar grupo existente
         await groupProvider.updateItemGroup(
@@ -102,15 +94,11 @@ class _EditItemGroupScreenState extends State<EditItemGroupScreen> {
           _nameController.text,
           description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
         );
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Grupo atualizado com sucesso!"), backgroundColor: Colors.green),
-        );
+        ErrorHandler.showSuccessSnackBar(context, "Grupo atualizado com sucesso!");
       }
       Navigator.of(context).pop();
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erro ao salvar grupo: $error"), backgroundColor: Colors.red),
-      );
+      ErrorHandler.showErrorSnackBar(context, "Erro ao salvar grupo: $error");
     } finally {
       if (mounted) {
          setState(() {

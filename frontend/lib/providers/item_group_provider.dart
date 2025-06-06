@@ -2,18 +2,15 @@
 import "package:flutter/foundation.dart";
 import "/models/item_group_model.dart";
 import "/services/api_service.dart";
+import "/utils/error_handler.dart";
 
-class ItemGroupProvider with ChangeNotifier {
+class ItemGroupProvider with ChangeNotifier, ErrorHandlingMixin {
   final ApiService _apiService;
   int? _storeId;
 
   List<ItemGroup> _groups = [];
-  bool _isLoading = false;
-  String? _error;
 
   List<ItemGroup> get groups => _groups;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
 
   // Construtor padrão para uso com ProxyProvider
   ItemGroupProvider() : _apiService = ApiService(), _storeId = null;
@@ -33,46 +30,36 @@ class ItemGroupProvider with ChangeNotifier {
     } else {
       // Clear groups when no valid store selected
       _groups = [];
-      _error = null;
-      _isLoading = false;
+      clearError();
+      setLoading(false);
       notifyListeners();
     }
-  }
-
-  void _setLoading(bool loading) {
-    if (_isLoading == loading) return;
-    _isLoading = loading;
-    if (loading) _error = null;
-    notifyListeners();
-  }
-
-  void _setError(String errorMsg) {
-    _error = errorMsg;
-    _isLoading = false;
-    notifyListeners();
-    debugPrint("ItemGroupProvider Error (Store: $_storeId): $errorMsg");
   }
 
   Future<void> fetchItemGroups() async {
     if (_storeId == null || _storeId! <= 0) {
-      _setError("ID da loja inválido para buscar grupos.");
+      setError("ID da loja inválido para buscar grupos.", 'fetchItemGroups');
       return;
     }
-    _setLoading(true);
-    try {
+    
+    await handleAsyncOperation(() async {
       _groups = await _apiService.fetchItemGroups(_storeId!);
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
+      debugPrint("[ItemGroupProvider] Grupos carregados: ${_groups.length}");
+    }, 'fetchItemGroups');
+    
+    // Clear groups on error
+    if (hasError) {
       _groups = [];
     }
   }
 
-  Future<ItemGroup> createItemGroup(String name, {String? description, int? parentGroupId}) async {
-    if (_storeId == null || _storeId! <= 0) throw Exception("ID da loja inválido.");
-    _setLoading(true);
-    try {
+  Future<ItemGroup?> createItemGroup(String name, {String? description, int? parentGroupId}) async {
+    if (_storeId == null || _storeId! <= 0) {
+      setError('ID da loja inválido.', 'createItemGroup');
+      return null;
+    }
+    
+    return await handleAsyncOperation(() async {
       // Criar objeto ItemGroup para passar ao ApiService
       final group = ItemGroup(
         id: 0, // ID será atribuído pelo backend
@@ -85,19 +72,18 @@ class ItemGroupProvider with ChangeNotifier {
       
       final newGroup = await _apiService.createItemGroup(_storeId!, group);
       _groups.add(newGroup);
-      _isLoading = false;
-      notifyListeners();
+      debugPrint("[ItemGroupProvider] Grupo criado: ${newGroup.name} (ID: ${newGroup.id})");
       return newGroup;
-    } catch (e) {
-      _setError(e.toString());
-      rethrow;
-    }
+    }, 'createItemGroup');
   }
 
-  Future<ItemGroup> updateItemGroup(int groupId, String name, {String? description, int? parentGroupId}) async {
-    if (_storeId == null || _storeId! <= 0) throw Exception("ID da loja inválido.");
-    _setLoading(true);
-    try {
+  Future<ItemGroup?> updateItemGroup(int groupId, String name, {String? description, int? parentGroupId}) async {
+    if (_storeId == null || _storeId! <= 0) {
+      setError('ID da loja inválido.', 'updateItemGroup');
+      return null;
+    }
+    
+    return await handleAsyncOperation(() async {
       // Encontrar o grupo existente
       final existingGroup = _groups.firstWhere(
         (g) => g.id == groupId,
@@ -115,26 +101,21 @@ class ItemGroupProvider with ChangeNotifier {
       if (index != -1) {
         _groups[index] = updatedGroup;
       }
-      _isLoading = false;
-      notifyListeners();
+      debugPrint("[ItemGroupProvider] Grupo atualizado: ${updatedGroup.name} (ID: $groupId)");
       return updatedGroup;
-    } catch (e) {
-      _setError(e.toString());
-      rethrow;
-    }
+    }, 'updateItemGroup');
   }
 
   Future<void> deleteItemGroup(int groupId) async {
-    if (_storeId == null || _storeId! <= 0) throw Exception("ID da loja inválido.");
-    _setLoading(true);
-    try {
+    if (_storeId == null || _storeId! <= 0) {
+      setError('ID da loja inválido.', 'deleteItemGroup');
+      return;
+    }
+    
+    await handleAsyncOperation(() async {
       await _apiService.deleteItemGroup(_storeId!, groupId);
       _groups.removeWhere((g) => g.id == groupId);
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
-      rethrow;
-    }
+      debugPrint("[ItemGroupProvider] Grupo excluído (ID: $groupId)");
+    }, 'deleteItemGroup');
   }
 }

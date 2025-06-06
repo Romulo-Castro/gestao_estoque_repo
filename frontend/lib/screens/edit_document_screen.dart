@@ -11,6 +11,7 @@ import '../providers/supplier_provider.dart';
 import '../providers/stock_provider.dart';
 import '../providers/store_provider.dart';
 import '../widgets/app_drawer.dart';
+import '../utils/error_handler.dart';
 
 class EditDocumentScreen extends StatefulWidget {
   final String? documentId;
@@ -71,9 +72,8 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
 
     setState(() => _isLoading = true);
 
-    try {
-      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
-      final document = await docProvider.fetchDocumentById(_documentId!);
+    try {      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+      final document = await docProvider.fetchDocumentById(int.parse(_documentId!));
 
       if (document != null) {
         setState(() {
@@ -85,12 +85,9 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
           _items.clear();
           _items.addAll(document.items);
         });
-      }
-    } catch (e) {
+      }    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao carregar documento: $e')),
-      );
+      ErrorHandler.showErrorSnackBar(context, 'Erro ao carregar documento: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -112,26 +109,111 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
         _selectedDate = pickedDate;
       });
     });
-  }
-
-  void _addItem() {
+  }  void _addItem() {
     if (_selectedStockItem == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione um item primeiro')),
-      );
+      ErrorHandler.showErrorSnackBar(context, 'Selecione um item primeiro');
       return;
     }
 
-    setState(() {
-      _items.add(doc_model.DocumentItem(
-        id: _selectedStockItem!.id.toString(),
-        name: _selectedStockItem!.name,
-        quantity: 0,
-        price: _selectedStockItem!.price ?? 0,
-        unit: _selectedStockItem!.properties['unit'] ?? 'UN',
-      ));
-      _selectedStockItem = null;
-    });
+    _showAddItemDialog();
+  }
+
+  void _showAddItemDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Adicionar ${_selectedStockItem!.name}'),
+          content: Form(
+            key: _addItemFormKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Item: ${_selectedStockItem!.name}'),
+                Text('Disponível: ${_selectedStockItem!.quantity} ${_selectedStockItem!.properties['unit'] ?? 'UN'}'),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _quantityController,
+                  decoration: InputDecoration(
+                    labelText: 'Quantidade*',
+                    suffixText: _selectedStockItem!.properties['unit'] ?? 'UN',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Digite a quantidade';
+                    }
+                    final quantity = double.tryParse(value);
+                    if (quantity == null || quantity <= 0) {
+                      return 'Quantidade deve ser maior que zero';
+                    }
+                    // Validar quantidade disponível para saída
+                    if (_selectedType == doc_model.DocumentType.saida && 
+                        quantity > _selectedStockItem!.quantity) {
+                      return 'Quantidade não disponível em estoque';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _priceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Preço Unitário*',
+                    prefixText: 'R\$ ',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Digite o preço';
+                    }
+                    final price = double.tryParse(value);
+                    if (price == null || price < 0) {
+                      return 'Preço deve ser maior ou igual a zero';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _quantityController.text = "1";
+                _priceController.text = "0.00";
+              },
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (_addItemFormKey.currentState!.validate()) {
+                  final quantity = double.parse(_quantityController.text);
+                  final price = double.parse(_priceController.text);
+                  
+                  setState(() {
+                    _items.add(doc_model.DocumentItem(
+                      id: _selectedStockItem!.id.toString(),
+                      name: _selectedStockItem!.name,
+                      quantity: quantity,
+                      price: price,
+                      unit: _selectedStockItem!.properties['unit'] ?? 'UN',
+                    ));
+                    _selectedStockItem = null;
+                  });
+                  
+                  Navigator.of(context).pop();
+                  _quantityController.text = "1";
+                  _priceController.text = "0.00";
+                }
+              },
+              child: const Text('Adicionar'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _removeItem(int index) {
@@ -172,30 +254,110 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
         status: 'DRAFT',
         createdAt: DateTime.now().toIso8601String(),
         updatedAt: DateTime.now().toIso8601String(),
-      );
-
-      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
-      final success = _documentId == null
+      );      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+      final result = _documentId == null
           ? await docProvider.createDocument(document)
-          : await docProvider.updateDocument(document);
+          : await docProvider.updateDocument(int.parse(_documentId!), document);      if (!mounted) return;      if (result != null) {
+        ErrorHandler.showSuccessSnackBar(context, 'Documento salvo com sucesso!');
+        Navigator.of(context).pop();      } else {
+        ErrorHandler.showErrorSnackBar(context, 'Erro ao salvar documento: ${docProvider.error}');
+      }    } catch (e) {
+      if (!mounted) return;
+      ErrorHandler.showErrorSnackBar(context, 'Erro: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // Processa o documento e atualiza o estoque
+  Future<void> _processDocument() async {
+    if (!mounted) return;
+
+    // Validação básica
+    if (_items.isEmpty) {
+      ErrorHandler.showErrorSnackBar(context, 'Adicione pelo menos um item ao documento');
+      return;
+    }
+
+    // Validações específicas por tipo
+    if (_selectedType == doc_model.DocumentType.saida && _selectedCustomer == null) {
+      ErrorHandler.showErrorSnackBar(context, 'Selecione um cliente para documentos de saída');
+      return;
+    }
+
+    if (_selectedType == doc_model.DocumentType.entrada && _selectedSupplier == null) {
+      ErrorHandler.showErrorSnackBar(context, 'Selecione um fornecedor para documentos de entrada');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Processar Documento'),
+        content: const Text('Confirma o processamento do documento? Esta ação irá atualizar o estoque e não poderá ser desfeita.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Processar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
+      if (storeId == null) {
+        throw Exception('Nenhuma loja selecionada');
+      }
+
+      // Criar documento com status PROCESSED
+      final document = doc_model.Document(
+        id: _documentId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        number: _numberController.text.isEmpty 
+            ? 'DOC-${DateTime.now().millisecondsSinceEpoch}' 
+            : _numberController.text,
+        type: _selectedType,
+        date: DateTime.now().toIso8601String().split('T')[0], // YYYY-MM-DD format
+        reference: _referenceController.text,
+        notes: _notesController.text,
+        items: _items,
+        customerId: _selectedCustomer?.id.toString(),
+        supplierId: _selectedSupplier?.id.toString(),
+        sourceWarehouseId: _selectedSourceWarehouseId?.toString(),
+        destinationWarehouseId: _selectedDestinationWarehouseId?.toString(),
+        status: 'PROCESSED',
+        createdAt: DateTime.now().toIso8601String(),
+        updatedAt: DateTime.now().toIso8601String(),
+      );      // Processar documento no backend (que deve atualizar o estoque automaticamente)
+      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+      final result = _documentId == null
+          ? await docProvider.createDocument(document)
+          : await docProvider.updateDocument(int.parse(_documentId!), document);
 
       if (!mounted) return;
 
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Documento salvo com sucesso!')),
-        );
+      if (result != null) {
+        // Atualizar cache local do estoque
+        final stockProvider = Provider.of<StockProvider>(context, listen: false);
+        await stockProvider.fetchStockItems(); // Recarrega os itens do estoque
+
+        ErrorHandler.showSuccessSnackBar(context, 'Documento processado com sucesso!');
         Navigator.of(context).pop();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar documento: ${docProvider.error}')),
-        );
+        ErrorHandler.showErrorSnackBar(context, 'Erro ao processar documento: ${docProvider.error}');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro: $e')),
-      );
+      ErrorHandler.showErrorSnackBar(context, 'Erro: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -227,11 +389,16 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_documentId == null ? 'Novo Documento' : 'Editar Documento'),
-        actions: [
+        title: Text(_documentId == null ? 'Novo Documento' : 'Editar Documento'),        actions: [
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: _isLoading ? null : _saveDocument,
+            tooltip: 'Salvar Rascunho',
+          ),
+          IconButton(
+            icon: const Icon(Icons.check_circle),
+            onPressed: (_isLoading || _items.isEmpty) ? null : _processDocument,
+            tooltip: 'Processar Documento',
           ),
         ],
       ),

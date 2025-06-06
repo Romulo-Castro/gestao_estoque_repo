@@ -39,10 +39,8 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
       final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
       if (storeId == null) {
         throw Exception("Nenhuma loja selecionada");
-      }
-
-      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
-      final document = await docProvider.fetchDocumentById(widget.documentId.toString());
+      }      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+      final document = await docProvider.fetchDocumentById(widget.documentId);
       
       if (mounted) {
         setState(() {

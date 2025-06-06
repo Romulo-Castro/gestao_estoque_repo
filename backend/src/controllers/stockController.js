@@ -5,6 +5,15 @@ const fs = require('fs');
 // Garante que dotenv seja carregado para ler process.env
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
+// Import centralized error handling utilities
+const { 
+    catchAsync, 
+    validateId, 
+    notFound, 
+    AppError,
+    sendSuccessResponse 
+} = require('../utils/errorHandler');
+
 const UPLOAD_DIR = process.env.UPLOAD_FOLDER || 'uploads';
 // Lê BASE_URL do .env ou usa localhost como fallback
 const BASE_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
@@ -16,213 +25,254 @@ const buildImageUrl = (filename) => {
 };
 
 // GET /api/stores/:storeId/stock
-exports.getAllStockItems = async (req, res, next) => {
-    const storeId = parseInt(req.params.storeId, 10);
-    try {
-        const items = await db.findStockItemsByStore(storeId);
-        const itemsWithFullUrls = items.map(item => ({
-            ...item,
-            image_filename: undefined,
-            imageUrl: buildImageUrl(item.image_filename)
-        }));
-        res.status(200).json(itemsWithFullUrls);
-    } catch (error) {
-        console.error(`[StockCtrl] Erro em getAllStockItems para loja ${storeId}:`, error);
-        next(error);
-    }
-};
+exports.getAllStockItems = catchAsync(async (req, res, next) => {
+    const storeId = validateId(req.params.storeId, 'ID da loja');
+    
+    const items = await db.findStockItemsByStore(storeId);
+    const itemsWithFullUrls = items.map(item => ({
+        ...item,
+        image_filename: undefined,
+        imageUrl: buildImageUrl(item.image_filename)
+    }));
+    
+    sendSuccessResponse(res, itemsWithFullUrls, 'Itens carregados com sucesso');
+});
 
 // GET /api/stores/:storeId/stock/:itemId
-exports.getStockItemById = async (req, res, next) => {
-     const storeId = parseInt(req.params.storeId, 10);
-     const itemId = parseInt(req.params.itemId, 10);
-     if (isNaN(itemId)) return res.status(400).json({ message: 'ID do item inválido.' });
-     try {
-        const item = await db.findStockItemByIdAndStore(itemId, storeId);
-        if (!item) {
-            return res.status(404).json({ message: 'Item não encontrado nesta loja.' });
-        }
-        res.status(200).json({
-            ...item,
-            image_filename: undefined,
-            imageUrl: buildImageUrl(item.image_filename)
-        });
-    } catch (error) {
-         console.error(`[StockCtrl] Erro em getStockItemById (Item: ${itemId}, Loja: ${storeId}):`, error);
-         next(error);
+exports.getStockItemById = catchAsync(async (req, res, next) => {
+    const storeId = validateId(req.params.storeId, 'ID da loja');
+    const itemId = validateId(req.params.itemId, 'ID do item');
+    
+    const item = await db.findStockItemByIdAndStore(itemId, storeId);
+    if (!item) {
+        return notFound('Item');
     }
-};
+    
+    const itemWithUrl = {
+        ...item,
+        image_filename: undefined,
+        imageUrl: buildImageUrl(item.image_filename)
+    };
+    
+    sendSuccessResponse(res, itemWithUrl, 'Item encontrado com sucesso');
+});
 
 // POST /api/stores/:storeId/stock
-exports.createStockItem = async (req, res, next) => {
-     const storeId = parseInt(req.params.storeId, 10);
-    try {
-        // ★★★ CORREÇÃO: Pega 'properties' e 'groupId' do corpo ★★★
-        const { name, quantity, properties, groupId } = req.body;
-        console.log(`[StockCtrl] Tentando criar item na loja ${storeId}:`, { name, quantity, properties, groupId });
-
-        if (!name) return res.status(400).json({ message: "Nome do item é obrigatório." });
-
-        // Validação básica de 'properties' (pode ser melhorada com express-validator)
-        if (properties && typeof properties !== 'object') {
-            return res.status(400).json({ message: "'properties' deve ser um objeto JSON." });
-        }
-
-        // Cria o item passando o objeto properties (ou um objeto vazio) e groupId
-        // A função createStockItemInStore no database.js fará o JSON.stringify
-        const result = await db.createStockItemInStore({
-            storeId,
-            name,
-            quantity: parseFloat(quantity) || 0.0,
-            groupId: groupId || null, // Processa o groupId enviado pelo frontend
-            properties: properties || {} // Garante que é um objeto
-        });
-        console.log(`[StockCtrl] Item criado com ID: ${result.lastID}`);
-
-        const newItem = await db.findStockItemByIdAndStore(result.lastID, storeId);
-        if (!newItem) {
-             console.error(`[StockCtrl] Erro crítico: Não encontrou item ${result.lastID} após criação.`);
-             return res.status(500).json({ message: "Erro ao buscar item após criação." });
-        }
-        console.log(`[StockCtrl] Retornando item criado ID: ${newItem.id}`);
-        res.status(201).json({
-            ...newItem, // newItem.properties já foi parseado pelo findStockItemByIdAndStore
-            image_filename: undefined,
-            imageUrl: buildImageUrl(newItem.image_filename)
-        });
-    } catch (error) {
-        console.error(`[StockCtrl] Erro em createStockItem para loja ${storeId}:`, error);
-        next(error);
+exports.createStockItem = catchAsync(async (req, res, next) => {
+    const storeId = validateId(req.params.storeId, 'ID da loja');
+    const { name, quantity, properties, groupId } = req.body;
+    
+    if (!name || name.trim() === '') {
+        throw new AppError('Nome do item é obrigatório.', 400);
     }
-};
+    
+    // Validação básica de 'properties'
+    if (properties && typeof properties !== 'object') {
+        throw new AppError("'properties' deve ser um objeto JSON.", 400);
+    }
+
+    // Validação de groupId se fornecido
+    if (groupId !== null && groupId !== undefined && isNaN(parseInt(groupId))) {
+        throw new AppError('ID do grupo deve ser um número válido.', 400);
+    }
+
+    // Cria o item passando o objeto properties (ou um objeto vazio) e groupId
+    const result = await db.createStockItemInStore({
+        storeId,
+        name: name.trim(),
+        quantity: parseFloat(quantity) || 0.0,
+        groupId: groupId || null,
+        properties: properties || {}
+    });
+
+    const newItem = await db.findStockItemByIdAndStore(result.lastID, storeId);
+    if (!newItem) {
+        throw new AppError('Erro ao buscar item após criação.', 500);
+    }
+    
+    const itemWithUrl = {
+        ...newItem,
+        image_filename: undefined,
+        imageUrl: buildImageUrl(newItem.image_filename)
+    };
+    
+    sendSuccessResponse(res, itemWithUrl, 'Item criado com sucesso', 201);
+});
 
 // PUT /api/stores/:storeId/stock/:itemId
-exports.updateStockItem = async (req, res, next) => {
-     const storeId = parseInt(req.params.storeId, 10);
-     const itemId = parseInt(req.params.itemId, 10);
-     if (isNaN(itemId)) return res.status(400).json({ message: 'ID do item inválido.' });
-    try {
-        // ★★★ CORREÇÃO: Pega 'properties' como um objeto do corpo ★★★
-        const { name, quantity, properties, groupId } = req.body;
-        console.log(`[StockCtrl] Tentando atualizar item ${itemId} na loja ${storeId}:`, { name, quantity, properties, groupId });
-        if (!name) return res.status(400).json({ message: "Nome do item é obrigatório." });
-
-        // Validação básica de 'properties'
-        if (properties && typeof properties !== 'object') {
-             return res.status(400).json({ message: "'properties' deve ser um objeto JSON." });
-        }
-
-        const existingItem = await db.findStockItemByIdAndStore(itemId, storeId);
-        if (!existingItem) {
-            return res.status(404).json({ message: "Item não encontrado nesta loja." });
-        }
-
-        // ★★★ CORREÇÃO: Passa o objeto 'properties' recebido ★★★
-        // A função updateStockItemDetails no database.js fará o JSON.stringify
-        // Se 'properties' não for enviado no PUT, existingItem.properties será usado (preservando dados)
-        const result = await db.updateStockItemDetails(itemId, storeId, {
-            name,
-            quantity: parseFloat(quantity) ?? existingItem.quantity, // Usa ?? para fallback seguro
-            properties: properties ?? existingItem.properties, // Usa properties recebido ou o existente
-            groupId: groupId !== undefined ? groupId : existingItem.group_id
-        });
-
-        if (result.changes === 0) {
-             console.log(`[StockCtrl] Nenhuma linha alterada para item ${itemId} na loja ${storeId}.`);
-             // Pode ser que os dados enviados sejam iguais aos existentes
-             // Retorna 200 com os dados atuais ou 304 Not Modified? Vamos retornar 200.
-             // return res.status(304).end(); // Alternativa Not Modified
-        }
-        console.log(`[StockCtrl] Item ${itemId} atualizado/verificado.`);
-
-        const updatedItem = await db.findStockItemByIdAndStore(itemId, storeId);
-        if (!updatedItem) {
-             console.error(`[StockCtrl] Erro crítico: Não encontrou item ${itemId} após atualização.`);
-             return res.status(500).json({ message: "Erro ao buscar item após atualização." });
-        }
-        console.log(`[StockCtrl] Retornando item atualizado ID: ${updatedItem.id}`);
-        res.status(200).json({
-            ...updatedItem, // updatedItem.properties já foi parseado
-            image_filename: undefined,
-            imageUrl: buildImageUrl(updatedItem.image_filename)
-        });
-    } catch (error) {
-        console.error(`[StockCtrl] Erro em updateStockItem (Item: ${itemId}, Loja: ${storeId}):`, error);
-        next(error);
+exports.updateStockItem = catchAsync(async (req, res, next) => {
+    const storeId = validateId(req.params.storeId, 'ID da loja');
+    const itemId = validateId(req.params.itemId, 'ID do item');
+    
+    const { name, quantity, properties, groupId } = req.body;
+    
+    if (!name || name.trim() === '') {
+        throw new AppError('Nome do item é obrigatório.', 400);
     }
-};
+    
+    // Validação básica de 'properties'
+    if (properties && typeof properties !== 'object') {
+        throw new AppError("'properties' deve ser um objeto JSON.", 400);
+    }
+
+    // Validação de groupId se fornecido
+    if (groupId !== null && groupId !== undefined && isNaN(parseInt(groupId))) {
+        throw new AppError('ID do grupo deve ser um número válido.', 400);
+    }
+
+    const existingItem = await db.findStockItemByIdAndStore(itemId, storeId);
+    if (!existingItem) {
+        return notFound('Item nesta loja');
+    }
+
+    // Atualiza o item no banco de dados
+    const result = await db.updateStockItemDetails(itemId, storeId, {
+        name: name.trim(),
+        quantity: parseFloat(quantity) ?? existingItem.quantity,
+        properties: properties ?? existingItem.properties,
+        groupId: groupId !== undefined ? groupId : existingItem.group_id
+    });
+
+    const updatedItem = await db.findStockItemByIdAndStore(itemId, storeId);
+    if (!updatedItem) {
+        throw new AppError('Erro ao buscar item após atualização.', 500);
+    }
+    
+    const itemWithUrl = {
+        ...updatedItem,
+        image_filename: undefined,
+        imageUrl: buildImageUrl(updatedItem.image_filename)
+    };
+    
+    sendSuccessResponse(res, itemWithUrl, 'Item atualizado com sucesso');
+});
 
 // DELETE /api/stores/:storeId/stock/:itemId
-exports.deleteStockItem = async (req, res, next) => {
-    const storeId = parseInt(req.params.storeId, 10);
-    const itemId = parseInt(req.params.itemId, 10);
-    if (isNaN(itemId)) return res.status(400).json({ message: 'ID do item inválido.' });
-    try {
-        console.log(`[StockCtrl] Tentando deletar item ${itemId} da loja ${storeId}.`);
-        const item = await db.findStockItemByIdAndStore(itemId, storeId);
-        if (!item) {
-            return res.status(404).json({ message: "Item não encontrado." });
-        }
-        const imageFilename = item.image_filename;
+exports.deleteStockItem = catchAsync(async (req, res, next) => {
+    const storeId = validateId(req.params.storeId, 'ID da loja');
+    const itemId = validateId(req.params.itemId, 'ID do item');
+    
+    const item = await db.findStockItemByIdAndStore(itemId, storeId);
+    if (!item) {
+        return notFound('Item');
+    }
+    
+    const imageFilename = item.image_filename;
+    const result = await db.deleteStockItemFromStore(itemId, storeId);
 
-        const result = await db.deleteStockItemFromStore(itemId, storeId);
-
-        if (result.changes > 0) {
-            console.log(`[StockCtrl] Item ${itemId} deletado do DB.`);
-            if (imageFilename) {
-                 const imagePath = path.resolve(__dirname, '../../', UPLOAD_DIR, imageFilename);
-                 fs.unlink(imagePath, (err) => { /* ... tratamento de erro unlink ... */ });
-            }
-            res.status(200).json({ message: "Item deletado com sucesso." });
-        } else {
-             res.status(404).json({ message: "Item não encontrado." }); // Caso raro
+    if (result.changes > 0) {
+        // Remove arquivo de imagem se existir
+        if (imageFilename) {
+            const imagePath = path.resolve(__dirname, '../../', UPLOAD_DIR, imageFilename);
+            fs.unlink(imagePath, (err) => {
+                if (err) {
+                    console.error(`Erro ao remover arquivo de imagem ${imagePath}:`, err);
+                }
+            });
         }
-    } catch (error) {
-        console.error(`[StockCtrl] Erro em deleteStockItem (Item: ${itemId}, Loja: ${storeId}):`, error);
-        if (error.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' || (error.message && error.message.includes('FOREIGN KEY constraint failed'))) {
-             return res.status(400).json({ message: "Não é possível excluir o item, pois ele está associado a documentos existentes." });
-        }
-        next(error);
-     }
-};
+        
+        sendSuccessResponse(res, null, 'Item deletado com sucesso');
+    } else {
+        return notFound('Item');
+    }
+});
 
 // POST /api/stores/:storeId/stock/:itemId/image
-exports.uploadStockItemImage = async (req, res, next) => {
-    const storeId = parseInt(req.params.storeId, 10);
-    const itemId = parseInt(req.params.itemId, 10);
-    if (isNaN(itemId)) return res.status(400).json({ message: 'ID do item inválido.' });
-    if (!req.file) return res.status(400).json({ message: 'Nenhuma imagem foi enviada.' });
+exports.uploadStockItemImage = catchAsync(async (req, res, next) => {
+    const storeId = validateId(req.params.storeId, 'ID da loja');
+    const itemId = validateId(req.params.itemId, 'ID do item');
+    
+    if (!req.file) {
+        throw new AppError('Nenhuma imagem foi enviada.', 400);
+    }
 
     const imageFilename = req.file.filename;
-    console.log(`[StockCtrl] Recebido upload de imagem ${imageFilename} para item ${itemId} na loja ${storeId}.`);
     let oldImagePath = null;
 
     try {
         const item = await db.findStockItemByIdAndStore(itemId, storeId);
         if (!item) {
-            fs.unlink(req.file.path, (err) => { if (err) console.error(`Erro ao remover ${req.file.path}:`, err);});
-            return res.status(404).json({ message: "Item não encontrado." });
+            // Remove arquivo uploaded se item não existe
+            fs.unlink(req.file.path, (err) => {
+                if (err) console.error(`Erro ao remover ${req.file.path}:`, err);
+            });
+            return notFound('Item');
         }
-        if (item.image_filename) { oldImagePath = path.resolve(__dirname, '../../', UPLOAD_DIR, item.image_filename); }
+        
+        // Se item já tem imagem, prepara para remover a antiga
+        if (item.image_filename) {
+            oldImagePath = path.resolve(__dirname, '../../', UPLOAD_DIR, item.image_filename);
+        }
 
         await db.updateStockItemImageFilename(itemId, storeId, imageFilename);
-        console.log(`[StockCtrl] DB atualizado com novo nome de imagem ${imageFilename} para item ${itemId}.`);
 
-        if (oldImagePath) { fs.unlink(oldImagePath, (err) => { /* ... tratamento erro unlink ... */ }); }
+        // Remove imagem antiga se existia
+        if (oldImagePath) {
+            fs.unlink(oldImagePath, (err) => {
+                if (err) console.error(`Erro ao remover imagem antiga ${oldImagePath}:`, err);
+            });
+        }
 
         const updatedItem = await db.findStockItemByIdAndStore(itemId, storeId);
-        if (!updatedItem) { return res.status(500).json({ message: "Erro ao buscar item após upload." }); }
+        if (!updatedItem) {
+            throw new AppError('Erro ao buscar item após upload.', 500);
+        }
 
-        console.log(`[StockCtrl] Retornando item ${itemId} atualizado com imagem.`);
-        res.status(200).json({
-            ...updatedItem, // properties já parseadas aqui
+        const itemWithUrl = {
+            ...updatedItem,
             image_filename: undefined,
             imageUrl: buildImageUrl(updatedItem.image_filename)
-        });
+        };
+        
+        sendSuccessResponse(res, itemWithUrl, 'Imagem enviada com sucesso');
 
-    } catch (error) {
-        console.error(`[StockCtrl] Erro em uploadStockItemImage (Item: ${itemId}, Loja: ${storeId}):`, error);
-        fs.unlink(req.file.path, (err) => { if (err) console.error(`Erro ao remover ${req.file.path} após falha:`, err); });
-        next(error);
+    } catch (dbError) {
+        // Remove arquivo uploaded em caso de erro
+        fs.unlink(req.file.path, (err) => {
+            if (err) console.error(`Erro ao remover ${req.file.path} após falha:`, err);
+        });
+        throw dbError;
     }
-};
+});
+
+// DELETE /api/stores/:storeId/stock/:itemId/image - Remove image from stock item
+exports.deleteStockItemImage = catchAsync(async (req, res, next) => {
+    const storeId = validateId(req.params.storeId, 'ID da loja');
+    const itemId = validateId(req.params.itemId, 'ID do item');
+
+    const item = await db.findStockItemByIdAndStore(itemId, storeId);
+    if (!item) {
+        return notFound('Item');
+    }
+
+    if (!item.image_filename) {
+        throw new AppError('Item não possui imagem para remover.', 404);
+    }
+
+    const imageFilename = item.image_filename;
+    const imagePath = path.resolve(__dirname, '../../', UPLOAD_DIR, imageFilename);
+
+    // Remove a referência da imagem no banco de dados
+    await db.updateStockItemImageFilename(itemId, storeId, null);
+
+    // Remove o arquivo físico
+    fs.unlink(imagePath, (err) => {
+        if (err) {
+            console.error(`Erro ao remover arquivo de imagem ${imagePath}:`, err);
+            // Não retorna erro para o cliente, pois a referência no DB já foi removida
+        }
+    });
+
+    const updatedItem = await db.findStockItemByIdAndStore(itemId, storeId);
+    if (!updatedItem) {
+        throw new AppError('Erro ao buscar item após remoção da imagem.', 500);
+    }
+
+    const itemWithUrl = {
+        ...updatedItem,
+        image_filename: undefined,
+        imageUrl: buildImageUrl(updatedItem.image_filename) // Should be null now
+    };
+    
+    sendSuccessResponse(res, itemWithUrl, 'Imagem removida com sucesso');
+});

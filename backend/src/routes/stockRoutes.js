@@ -47,4 +47,11 @@ router.post('/:itemId/image',
     stockController.uploadStockItemImage // Associa ao item
 );
 
+// DELETE /api/stores/:storeId/stock/:itemId/image - Remove image
+router.delete('/:itemId/image',
+    validateIdParam('itemId'),
+    handleValidationErrors,
+    stockController.deleteStockItemImage
+);
+
 module.exports = router;

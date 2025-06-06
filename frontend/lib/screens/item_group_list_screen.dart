@@ -5,6 +5,7 @@ import "/providers/item_group_provider.dart";
 import "/providers/store_provider.dart";
 import "/screens/edit_item_group_screen.dart";
 import "/widgets/app_drawer.dart";
+import "/utils/error_handler.dart";
 
 class ItemGroupListScreen extends StatefulWidget {
   const ItemGroupListScreen({super.key});
@@ -115,16 +116,11 @@ class _ItemGroupListScreenState extends State<ItemGroupListScreen> {
                         ],
                       ),
                     );
-                    if (confirm == true) {
-                      try {
+                    if (confirm == true) {                      try {
                         await groupProvider.deleteItemGroup(group.id);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Grupo excluído!"), backgroundColor: Colors.green),
-                        );
+                        ErrorHandler.showSuccessSnackBar(context, "Grupo excluído!");
                       } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Erro ao excluir: $e"), backgroundColor: Colors.red),
-                        );
+                        ErrorHandler.showErrorSnackBar(context, "Erro ao excluir: $e");
                       }
                     }
                   },

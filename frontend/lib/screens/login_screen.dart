@@ -23,7 +23,6 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordController.dispose();
     super.dispose();
   }
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -31,6 +30,13 @@ class _LoginScreenState extends State<LoginScreen> {
     _formKey.currentState!.save(); // Garante que os valores mais recentes sejam usados
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Mostrar indicador de loading
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Realizando login...'), duration: Duration(seconds: 2)),
+      );
+    }
 
     final success = await authProvider.login(
       _emailController.text.trim(),
@@ -41,12 +47,23 @@ class _LoginScreenState extends State<LoginScreen> {
       authProvider.clearError();
       // Reset navigation to root so AuthWrapper can redirect appropriately
       if (context.mounted) {
+        // Remover snackbar anterior
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/',
           (route) => false,
         );
       }
+    } else if (context.mounted) {
+      // Mostrar erro específico
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro no login: ${authProvider.error ?? "Falha na autenticação"}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
     // If login failed, AuthProvider.error is shown via Consumer
   }

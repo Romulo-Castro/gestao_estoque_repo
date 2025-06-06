@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '/models/store_model.dart';
 import '/providers/store_provider.dart';
 import '/screens/edit_store_screen.dart';
+import '/utils/error_handler.dart';
 
 class StoreManagementScreen extends StatefulWidget {
   const StoreManagementScreen({super.key});
@@ -30,10 +31,9 @@ class _StoreManagementScreenState extends State<StoreManagementScreen> {
     if (!mounted) return;
     final storeProvider = Provider.of<StoreProvider>(context, listen: false);
     try {
-      await storeProvider.fetchStores();
-    } catch (e) {
+      await storeProvider.fetchStores();    } catch (e) {
        // ★★★ VERIFICAÇÃO mounted ANTES DE USAR context ★★★
-      if(mounted) _showErrorSnackbar(context, "Erro ao buscar lojas: $e");
+      if(mounted) ErrorHandler.showErrorSnackBar(context, e);
     }
   }
 
@@ -56,24 +56,21 @@ class _StoreManagementScreenState extends State<StoreManagementScreen> {
           title: const Text('Confirmar Exclusão'), content: Text('Excluir loja "${store.name}"?\nTODOS os dados serão perdidos!'),
           actions: <Widget>[ TextButton(child: const Text('Cancelar'), onPressed: () => Navigator.of(ctx).pop(false)), TextButton(style: TextButton.styleFrom(foregroundColor: Colors.red), child: const Text('Excluir'), onPressed: () => Navigator.of(ctx).pop(true)),],
       ),
-    );
-
-    if (confirmed == true) { // Não precisa checar mounted aqui pois showDialog só retorna se ainda montado
+    );    if (confirmed == true) { // Não precisa checar mounted aqui pois showDialog só retorna se ainda montado
         final storeProvider = context.read<StoreProvider>(); // Usa read para ação
-        final scaffoldMessenger = ScaffoldMessenger.of(context); // Guarda para usar depois do await
-         scaffoldMessenger.showSnackBar(const SnackBar(content: Text("Excluindo loja..."), duration: Duration(seconds: 5)));
+        ErrorHandler.showLoadingSnackBar(context, "Excluindo loja...");
         try {
             await storeProvider.deleteStore(store.id); // await
-            // ★★★ VERIFICAÇÃO mounted ANTES DE USAR context (scaffoldMessenger) ★★★
+            // ★★★ VERIFICAÇÃO mounted ANTES DE USAR context ★★★
             if (mounted) {
-               scaffoldMessenger.removeCurrentSnackBar();
-               _showSuccessSnackbar(context, "Loja excluída com sucesso.");
+               ScaffoldMessenger.of(context).removeCurrentSnackBar();
+               ErrorHandler.showSuccessSnackBar(context, "Loja excluída com sucesso.");
             }
         } catch (e) {
-             // ★★★ VERIFICAÇÃO mounted ANTES DE USAR context (scaffoldMessenger) ★★★
+             // ★★★ VERIFICAÇÃO mounted ANTES DE USAR context ★★★
             if (mounted) {
-               scaffoldMessenger.removeCurrentSnackBar();
-               _showErrorSnackbar(context, "Erro ao excluir loja: $e");
+               ScaffoldMessenger.of(context).removeCurrentSnackBar();
+               ErrorHandler.showErrorSnackBar(context, e);
             }
         }
     }
@@ -136,18 +133,5 @@ class _StoreManagementScreenState extends State<StoreManagementScreen> {
         },
         separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
       ),
-    );
-  }
-
-  // --- Funções Auxiliares SnackBar ---
-  void _showErrorSnackbar(BuildContext ctx, String message) {
-    // A verificação 'mounted' é feita antes de chamar esta função
-    ScaffoldMessenger.of(ctx).removeCurrentSnackBar();
-    ScaffoldMessenger.of(ctx).showSnackBar( SnackBar(content: Text(message), backgroundColor: Theme.of(ctx).colorScheme.error));
-  }
-  void _showSuccessSnackbar(BuildContext ctx, String message) {
-     // A verificação 'mounted' é feita antes de chamar esta função
-    ScaffoldMessenger.of(ctx).removeCurrentSnackBar();
-    ScaffoldMessenger.of(ctx).showSnackBar( SnackBar(content: Text(message), backgroundColor: Colors.green[600]));
-  }
+    );  }
 } // Fim da classe _StoreManagementScreenState

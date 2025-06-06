@@ -2,18 +2,15 @@
 import "package:flutter/foundation.dart";
 import "/models/customer_model.dart";
 import "/services/api_service.dart";
+import "/utils/error_handler.dart";
 
-class CustomerProvider with ChangeNotifier {
+class CustomerProvider with ChangeNotifier, ErrorHandlingMixin {
   final ApiService _apiService;
   int? _storeId;
 
   List<Customer> _customers = [];
-  bool _isLoading = false;
-  String? _error;
 
   List<Customer> get customers => _customers;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
 
   // Construtor padrão para uso com ProxyProvider
   CustomerProvider() : _apiService = ApiService(), _storeId = null;
@@ -36,87 +33,64 @@ class CustomerProvider with ChangeNotifier {
     }
   }
 
-  void _setLoading(bool loading) {
-    if (_isLoading == loading) return;
-    _isLoading = loading;
-    if (loading) _error = null;
-    notifyListeners();
-  }
-
-  void _setError(String errorMsg) {
-    _error = errorMsg;
-    _isLoading = false;
-    notifyListeners();
-    debugPrint("CustomerProvider Error (Store: $_storeId): $errorMsg");
-  }
-
   Future<void> fetchCustomers() async {
     if (_storeId == null || _storeId! <= 0) {
-      _setError("ID da loja inválido para buscar clientes.");
+      setError("ID da loja inválido para buscar clientes.", 'fetchCustomers');
       return;
     }
-    _setLoading(true);
-    try {
+    
+    await handleAsyncOperation(() async {
       _customers = await _apiService.fetchCustomers(_storeId!);
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
+      debugPrint("[CustomerProvider] Clientes carregados: ${_customers.length}");
+    }, 'fetchCustomers');
+    
+    // Clear customers on error
+    if (hasError) {
       _customers = [];
     }
   }
 
-  Future<Customer> createCustomer(Customer customer) async {
-    if (_storeId == null || _storeId! <= 0) throw Exception("ID da loja inválido.");
-    _setLoading(true);
-    try {
-      final newCustomer = await _apiService.createCustomer(
-        _storeId!,
-        customer,
-      );
-      _customers.add(newCustomer);
-      _isLoading = false;
-      notifyListeners();
-      return newCustomer;
-    } catch (e) {
-      _setError(e.toString());
-      rethrow;
+  Future<Customer?> createCustomer(Customer customer) async {
+    if (_storeId == null || _storeId! <= 0) {
+      setError('ID da loja inválido.', 'createCustomer');
+      return null;
     }
+    
+    return await handleAsyncOperation(() async {
+      final newCustomer = await _apiService.createCustomer(_storeId!, customer);
+      _customers.add(newCustomer);
+      debugPrint("[CustomerProvider] Cliente criado: ${newCustomer.name} (ID: ${newCustomer.id})");
+      return newCustomer;
+    }, 'createCustomer');
   }
 
-  Future<Customer> updateCustomer(int customerId, Customer customer) async {
-    if (_storeId == null || _storeId! <= 0) throw Exception("ID da loja inválido.");
-    _setLoading(true);
-    try {
-      final updatedCustomer = await _apiService.updateCustomer(
-        _storeId!,
-        customerId,
-        customer,
-      );
+  Future<Customer?> updateCustomer(int customerId, Customer customer) async {
+    if (_storeId == null || _storeId! <= 0) {
+      setError('ID da loja inválido.', 'updateCustomer');
+      return null;
+    }
+    
+    return await handleAsyncOperation(() async {
+      final updatedCustomer = await _apiService.updateCustomer(_storeId!, customerId, customer);
       final index = _customers.indexWhere((c) => c.id == customerId);
       if (index != -1) {
         _customers[index] = updatedCustomer;
       }
-      _isLoading = false;
-      notifyListeners();
+      debugPrint("[CustomerProvider] Cliente atualizado: ${updatedCustomer.name} (ID: $customerId)");
       return updatedCustomer;
-    } catch (e) {
-      _setError(e.toString());
-      rethrow;
-    }
+    }, 'updateCustomer');
   }
 
   Future<void> deleteCustomer(int customerId) async {
-    if (_storeId == null || _storeId! <= 0) throw Exception("ID da loja inválido.");
-    _setLoading(true);
-    try {
+    if (_storeId == null || _storeId! <= 0) {
+      setError('ID da loja inválido.', 'deleteCustomer');
+      return;
+    }
+    
+    await handleAsyncOperation(() async {
       await _apiService.deleteCustomer(_storeId!, customerId);
       _customers.removeWhere((c) => c.id == customerId);
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
-      rethrow;
-    }
+      debugPrint("[CustomerProvider] Cliente excluído (ID: $customerId)");
+    }, 'deleteCustomer');
   }
 }

@@ -163,25 +163,24 @@ class Document {
     required this.createdAt,
     required this.updatedAt,
   });
-
   factory Document.fromJson(Map<String, dynamic> json) {
     return Document(
-      id: json['id'] as String,
-      number: json['number'] as String,
-      type: DocumentType.fromString(json['type'] as String),
-      date: json['date'] as String,
-      reference: json['reference'] as String?,
-      notes: json['notes'] as String?,
-      items: (json['items'] as List<dynamic>)
+      id: (json['id'] ?? '').toString(),
+      number: (json['number'] ?? json['document_number'] ?? '').toString(),
+      type: DocumentType.fromString((json['type'] ?? 'unknown').toString()),
+      date: (json['date'] ?? json['document_date'] ?? '').toString(),
+      reference: json['reference']?.toString(),
+      notes: json['notes']?.toString(),
+      items: (json['items'] as List<dynamic>? ?? [])
           .map((item) => DocumentItem.fromJson(item as Map<String, dynamic>))
           .toList(),
-      customerId: json['customerId'] as String?,
-      supplierId: json['supplierId'] as String?,
-      sourceWarehouseId: json['sourceWarehouseId'] as String?,
-      destinationWarehouseId: json['destinationWarehouseId'] as String?,
-      status: json['status'] as String,
-      createdAt: json['createdAt'] as String,
-      updatedAt: json['updatedAt'] as String,
+      customerId: json['customerId']?.toString() ?? json['customer_id']?.toString(),
+      supplierId: json['supplierId']?.toString() ?? json['supplier_id']?.toString(),
+      sourceWarehouseId: json['sourceWarehouseId']?.toString() ?? json['source_warehouse_id']?.toString(),
+      destinationWarehouseId: json['destinationWarehouseId']?.toString() ?? json['destination_warehouse_id']?.toString(),
+      status: (json['status'] ?? 'DRAFT').toString(),
+      createdAt: (json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String()).toString(),
+      updatedAt: (json['updatedAt'] ?? json['updated_at'] ?? DateTime.now().toIso8601String()).toString(),
     );
   }
 

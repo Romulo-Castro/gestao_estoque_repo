@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '/providers/auth_provider.dart';
 import '/main.dart'; // Para AppRoutes
+import '/utils/error_handler.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -46,29 +47,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
 
     // Verifica 'mounted' antes de interagir com context ou setState
-    if (!mounted) return; // Sai se desmontado durante o await
-
-    setState(() => _isRegistering = false); // Desativa loading
+    if (!mounted) return; // Sai se desmontado durante o await    setState(() => _isRegistering = false); // Desativa loading
 
     if (success) {
       // Mostra SnackBar de sucesso e navega para Login
-       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Registro concluído! Agora faça o login."),
-            duration: Duration(seconds: 3),
-            backgroundColor: Colors.green,
-            )
-       );
+      ErrorHandler.showSuccessSnackBar(
+        context, 
+        "Registro concluído! Agora faça o login.",
+      );
       // Usa pushReplacementNamed para ir para login
       Navigator.pushReplacementNamed(context, AppRoutes.login);
     } else {
-      // Mostra SnackBar de erro
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.error ?? 'Falha no registro.'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      // Mostra SnackBar de erro usando ErrorHandler
+      ErrorHandler.showErrorSnackBar(context, authProvider.error ?? 'Falha no registro.');
     }
   }
 

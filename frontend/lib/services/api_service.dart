@@ -1,6 +1,7 @@
 // lib/services/api_service.dart
 import 'dart:convert';
 import 'dart:io'; // Para File, se usar upload de imagem
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 // Importe seus modelos aqui se precisar retornar tipos específicos
 import '../models/document_model.dart';
@@ -45,22 +46,25 @@ class ApiService {
     }
     // print("ApiService: Gerando headers: $headers"); // Pode ser muito verboso
     return headers;
-  }
-
-  Future<dynamic> _handleResponse(http.Response response) async {
-    // print("ApiService: _handleResponse - Status: ${response.statusCode}, Body: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}..."); // Log truncado do body
-
+  }  Future<dynamic> _handleResponse(http.Response response) async {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) {
-        // print("ApiService: _handleResponse (Sucesso) - Corpo da resposta vazio.");
         return {}; // Retorna um mapa vazio se o corpo estiver vazio
       }
       try {
         final decodedBody = json.decode(response.body);
-        // print("ApiService: _handleResponse (Sucesso) - Corpo decodificado: $decodedBody");
-        return decodedBody;
+        
+        // Se a resposta segue o padrão { status, message, data }
+        if (decodedBody is Map && 
+            decodedBody.containsKey('status') && 
+            decodedBody['status'] == 'success' && 
+            decodedBody.containsKey('data')) {
+          // Retorna apenas o objeto 'data'
+          return decodedBody['data'];
+        }
+        
+        // Caso contrário, retorna o corpo completo        return decodedBody;
       } catch (e) {
-        // print("ApiService: _handleResponse (Sucesso) - Erro ao decodificar JSON: $e. Corpo original: ${response.body}");
         throw Exception('Falha ao decodificar resposta do servidor.');
       }
     } else {
@@ -76,10 +80,8 @@ class ApiService {
         } catch (e) {
           // Se o corpo do erro não for JSON válido
           errorMessage = 'Erro do servidor: ${response.statusCode}. Detalhes não puderam ser lidos.';
-          // print("ApiService: _handleResponse (Erro) - Não foi possível decodificar corpo do erro: ${response.body}");
-        }
-      }
-      // print("ApiService: _handleResponse (Erro) - Mensagem: $errorMessage");
+        }      }
+      debugPrint("ApiService: _handleResponse (Erro) - Mensagem: $errorMessage");
       throw Exception(errorMessage);
     }
   }
@@ -156,8 +158,7 @@ class ApiService {
     final data = await _handleResponse(response) as List;
     return data.map((e) => Store.fromJson(e)).toList();
   }
-
-  Future<Store> createStore(String name, String address) async {
+  Future<Store> createStore(String name, String? address) async {
     final url = Uri.parse('$baseUrl/stores');
     final response = await http.post(
       url,
@@ -168,7 +169,7 @@ class ApiService {
     return Store.fromJson(data);
   }
 
-  Future<Store> updateStore(int storeId, String name, String address) async {
+  Future<Store> updateStore(int storeId, String name, String? address) async {
     final url = Uri.parse('$baseUrl/stores/$storeId');
     final response = await http.put(
       url,
@@ -292,7 +293,6 @@ class ApiService {
     final response = await http.delete(url, headers: _headers);
     await _handleResponse(response);
   }
-
   Future<StockItem> uploadImage(int storeId, int itemId, File file) async {
     final url = Uri.parse('$baseUrl/stores/$storeId/stock/$itemId/image');
     final request = http.MultipartRequest('POST', url);
@@ -303,10 +303,12 @@ class ApiService {
     final data = await _handleResponse(response) as Map<String, dynamic>;
     return StockItem.fromJson(data);
   }
-
-  Future<void> deleteItemImage(int storeId, int itemId) async {
-    // Backend does not provide separate delete image route; updateStockItem without image
-    await updateStockItem(storeId, itemId, (await fetchStockItems(storeId)).firstWhere((i) => i.id == itemId).copyWith(imageUrl: null));
+  
+  Future<StockItem> deleteItemImage(int storeId, int itemId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/stock/$itemId/image');
+    final response = await http.delete(url, headers: _headers);
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return StockItem.fromJson(data);
   }
 
   // Documents endpoints
@@ -364,6 +366,34 @@ class ApiService {
     final response = await http.get(url, headers: _headers);
     final data = await _handleResponse(response) as List;
     return data.map((e) => Document.fromJson(e)).toList();
+  }
+
+  Future<Document> updateDocument(int storeId, int documentId, Document document) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/documents/$documentId');
+    final response = await http.put(
+      url,
+      headers: _headers,
+      body: json.encode(document.toJson()),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return Document.fromJson(data);
+  }
+
+  Future<Document> updateDocumentStatus(int storeId, int documentId, String status) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/documents/$documentId/status');
+    final response = await http.patch(
+      url,
+      headers: _headers,
+      body: json.encode({'status': status}),
+    );
+    final data = await _handleResponse(response) as Map<String, dynamic>;
+    return Document.fromJson(data);
+  }
+
+  Future<void> deleteDocument(int storeId, int documentId) async {
+    final url = Uri.parse('$baseUrl/stores/$storeId/documents/$documentId');
+    final response = await http.delete(url, headers: _headers);
+    await _handleResponse(response);
   }
 
   // Suppliers endpoints

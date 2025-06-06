@@ -1,10 +1,14 @@
 // lib/screens/reports_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '/providers/document_provider.dart';
 import '/providers/stock_provider.dart';
 import '/providers/store_provider.dart';
+import '/services/pdf_report_service.dart';
+import '/services/simple_report_service.dart';
 import '/utils/app_prefs.dart';
+import '/utils/error_handler.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -51,42 +55,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context, bool isStartDate) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: isStartDate ? _startDate : _endDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null && mounted) {
-      setState(() {
-        if (isStartDate) {
-          _startDate = picked;
-        } else {
-          _endDate = picked;
-        }
-      });
-    }
-  }
-
   Future<void> _generateReport() async {
     if (_isLoading) return;
 
     setState(() => _isLoading = true);
 
     try {
-      final documentProvider = context.read<DocumentProvider>();
-      final stockProvider = context.read<StockProvider>();
-
       switch (_selectedReportType) {
         case 'stock_movement':
-          await _generateStockMovementReport(stockProvider);
+          await _generateStockReportPdf();
           break;
         case 'documents':
-          await _generateDocumentReport(documentProvider);
+          await _generateDocumentReportPdf();
           break;
         case 'inventory':
-          await _generateInventoryReport(stockProvider);
+          await _generateInventoryReportPdf();
+          break;
+        case 'financial':
+          await _generateFinancialReportPdf();
           break;
       }
 
@@ -137,151 +123,339 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
-  Future<void> _generateStockMovementReport(StockProvider provider) async {
+  // PDF Report Generation Methods (with fallback)
+  Future<void> _generateStockReportPdf() async {
     try {
       final storeProvider = Provider.of<StoreProvider>(context, listen: false);
-      final currentStore = storeProvider.selectedStore;
+      final stockProvider = Provider.of<StockProvider>(context, listen: false);
       
-      if (currentStore == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Selecione uma loja primeiro"),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
+      final selectedStore = storeProvider.selectedStore;
+      if (selectedStore == null) {
+        ErrorHandler.showErrorSnackBar(context, 'Nenhuma loja selecionada');
         return;
       }
 
-      await provider.fetchStockItems();
-      final items = provider.items;
+      await stockProvider.fetchStockItems();
+      final items = stockProvider.items;
       
       if (items.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Nenhum item em estoque encontrado"),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
+        ErrorHandler.showErrorSnackBar(context, 'Nenhum item de estoque encontrado');
         return;
       }
 
-      // Generate a simple stock movement report
-      String reportContent = "RELATÓRIO DE MOVIMENTAÇÃO DE ESTOQUE\n";
-      reportContent += "Loja: ${currentStore.name}\n";
-      reportContent += "Data: ${DateTime.now().toString().split(' ')[0]}\n\n";
-      reportContent += "ITENS EM ESTOQUE:\n";
-      
-      for (var item in items) {
-        reportContent += "${item.name} - Qtd: ${item.quantity} - Preço: R\$ ${item.price?.toStringAsFixed(2) ?? 'N/A'}\n";
-      }
+      try {
+        final pdfBytes = await PdfReportService.generateStockReport(
+          items: items,
+          store: selectedStore,
+          title: 'Relatório de Estoque - ${selectedStore.name}',
+        );
 
-      // Here you would typically save or share the report
-      debugPrint(reportContent);
+        await PdfReportService.previewPdf(
+          pdfBytes, 
+          'Relatório de Estoque - ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'
+        );
+      } catch (e) {
+        // Fallback to simple text report
+        debugPrint('PDF generation failed, using fallback: $e');
+        await _generateStockReportFallback();
+      }
       
     } catch (e) {
-      debugPrint("Erro ao gerar relatório: $e");
+      ErrorHandler.showErrorSnackBar(context, 'Erro ao gerar relatório: $e');
       rethrow;
     }
   }
 
-  Future<void> _generateDocumentReport(DocumentProvider provider) async {
+  Future<void> _generateDocumentReportPdf() async {
     try {
       final storeProvider = Provider.of<StoreProvider>(context, listen: false);
-      final currentStore = storeProvider.selectedStore;
+      final documentProvider = Provider.of<DocumentProvider>(context, listen: false);
       
-      if (currentStore == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Selecione uma loja primeiro"),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
+      final selectedStore = storeProvider.selectedStore;
+      if (selectedStore == null) {
+        ErrorHandler.showErrorSnackBar(context, 'Nenhuma loja selecionada');
         return;
       }
 
-      await provider.fetchDocuments();
-      final documents = provider.documents;
+      await documentProvider.fetchDocuments();
       
-      if (documents.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Nenhum documento encontrado"),
-              backgroundColor: Colors.orange,
-            ),
-          );
+      // Filtrar documentos por período
+      final allDocuments = documentProvider.documents;
+      final filteredDocuments = allDocuments.where((doc) {
+        try {
+          final docDate = DateTime.parse(doc.date);
+          return docDate.isAfter(_startDate.subtract(const Duration(days: 1))) &&
+                 docDate.isBefore(_endDate.add(const Duration(days: 1)));
+        } catch (e) {
+          return false;
         }
+      }).toList();
+
+      if (filteredDocuments.isEmpty) {
+        ErrorHandler.showErrorSnackBar(context, 'Nenhum documento encontrado no período selecionado');
         return;
       }
 
-      // Generate document report
-      String reportContent = "RELATÓRIO DE DOCUMENTOS\n";
-      reportContent += "Loja: ${currentStore.name}\n";
-      reportContent += "Data: ${DateTime.now().toString().split(' ')[0]}\n\n";
-      reportContent += "DOCUMENTOS:\n";
-      
-      for (var doc in documents) {
-        reportContent += "${doc.type.toString().split('.').last} - ${doc.number} - ${doc.date.toString().split(' ')[0]}\n";
-      }
+      try {
+        final pdfBytes = await PdfReportService.generateDocumentReport(
+          documents: filteredDocuments,
+          store: selectedStore,
+          title: 'Relatório de Documentos - ${selectedStore.name}',
+          startDate: _startDate,
+          endDate: _endDate,
+        );
 
-      debugPrint(reportContent);
+        await PdfReportService.previewPdf(
+          pdfBytes, 
+          'Relatório de Documentos - ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'
+        );
+      } catch (e) {
+        // Fallback to simple text report
+        debugPrint('PDF generation failed, using fallback: $e');
+        await _generateDocumentReportFallback();
+      }
       
     } catch (e) {
-      debugPrint("Erro ao gerar relatório de documentos: $e");
+      ErrorHandler.showErrorSnackBar(context, 'Erro ao gerar relatório: $e');
       rethrow;
     }
   }
 
-  Future<void> _generateInventoryReport(StockProvider provider) async {
+  Future<void> _generateInventoryReportPdf() async {
     try {
       final storeProvider = Provider.of<StoreProvider>(context, listen: false);
-      final currentStore = storeProvider.selectedStore;
+      final stockProvider = Provider.of<StockProvider>(context, listen: false);
       
-      if (currentStore == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Selecione uma loja primeiro"),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
+      final selectedStore = storeProvider.selectedStore;
+      if (selectedStore == null) {
+        ErrorHandler.showErrorSnackBar(context, 'Nenhuma loja selecionada');
         return;
       }
 
-      await provider.fetchStockItems();
-      final items = provider.items;
-      
-      // Generate inventory report with totals
-      String reportContent = "RELATÓRIO DE INVENTÁRIO\n";
-      reportContent += "Loja: ${currentStore.name}\n";
-      reportContent += "Data: ${DateTime.now().toString().split(' ')[0]}\n\n";
-      
-      double totalValue = 0.0;
-      int totalItems = 0;
-      
-      reportContent += "INVENTÁRIO COMPLETO:\n";
-      for (var item in items) {
-        final itemValue = (item.price ?? 0.0) * item.quantity;
-        totalValue += itemValue;
-        totalItems++;
-        reportContent += "${item.name} - Qtd: ${item.quantity} - Valor Total: R\$ ${itemValue.toStringAsFixed(2)}\n";
+      await stockProvider.fetchStockItems();
+      final items = stockProvider.items;
+
+      try {
+        final pdfBytes = await PdfReportService.generateStockReport(
+          items: items,
+          store: selectedStore,
+          title: 'Relatório de Inventário - ${selectedStore.name}',
+        );
+
+        await PdfReportService.previewPdf(
+          pdfBytes, 
+          'Relatório de Inventário - ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'
+        );
+      } catch (e) {
+        // Fallback to simple text report
+        debugPrint('PDF generation failed, using fallback: $e');
+        await _generateStockReportFallback();
       }
       
-      reportContent += "\nRESUMO:\n";
-      reportContent += "Total de itens: $totalItems\n";
-      reportContent += "Valor total do inventário: R\$ ${totalValue.toStringAsFixed(2)}\n";
+    } catch (e) {
+      ErrorHandler.showErrorSnackBar(context, 'Erro ao gerar relatório: $e');
+      rethrow;
+    }
+  }
 
-      debugPrint(reportContent);
+  Future<void> _generateFinancialReportPdf() async {
+    try {
+      final storeProvider = Provider.of<StoreProvider>(context, listen: false);
+      final documentProvider = Provider.of<DocumentProvider>(context, listen: false);
+      
+      final selectedStore = storeProvider.selectedStore;
+      if (selectedStore == null) {
+        ErrorHandler.showErrorSnackBar(context, 'Nenhuma loja selecionada');
+        return;
+      }
+
+      await documentProvider.fetchDocuments();
+      
+      // Filtrar documentos por período
+      final allDocuments = documentProvider.documents;
+      final filteredDocuments = allDocuments.where((doc) {
+        try {
+          final docDate = DateTime.parse(doc.date);
+          return docDate.isAfter(_startDate.subtract(const Duration(days: 1))) &&
+                 docDate.isBefore(_endDate.add(const Duration(days: 1)));
+        } catch (e) {
+          return false;
+        }
+      }).toList();
+
+      try {
+        final pdfBytes = await PdfReportService.generateFinancialReport(
+          documents: filteredDocuments,
+          store: selectedStore,
+          startDate: _startDate,
+          endDate: _endDate,
+          title: 'Relatório Financeiro - ${selectedStore.name}',
+        );
+
+        await PdfReportService.previewPdf(
+          pdfBytes, 
+          'Relatório Financeiro - ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'
+        );
+      } catch (e) {
+        // Fallback to simple text report
+        debugPrint('PDF generation failed, using fallback: $e');
+        await _generateFinancialReportFallback();
+      }
       
     } catch (e) {
-      debugPrint("Erro ao gerar relatório de inventário: $e");
+      ErrorHandler.showErrorSnackBar(context, 'Erro ao gerar relatório: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _selectDateRange() async {
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+      helpText: 'Selecionar período',
+      cancelText: 'Cancelar',
+      confirmText: 'Confirmar',
+    );
+
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+      });
+    }
+  }
+
+  // Fallback methods using simple report service
+  Future<void> _generateStockReportFallback() async {
+    try {
+      final storeProvider = Provider.of<StoreProvider>(context, listen: false);
+      final stockProvider = Provider.of<StockProvider>(context, listen: false);
+      
+      final selectedStore = storeProvider.selectedStore;
+      if (selectedStore == null) {
+        ErrorHandler.showErrorSnackBar(context, 'Nenhuma loja selecionada');
+        return;
+      }
+
+      await stockProvider.fetchStockItems();
+      final items = stockProvider.items;
+      
+      if (items.isEmpty) {
+        ErrorHandler.showErrorSnackBar(context, 'Nenhum item de estoque encontrado');
+        return;
+      }
+
+      final reportContent = await SimpleReportService.generateStockReport(
+        items: items,
+        store: selectedStore,
+        title: 'Relatório de Estoque - ${selectedStore.name}',
+      );
+
+      await SimpleReportService.showReportDialog(
+        context,
+        reportContent,
+        'Relatório de Estoque'
+      );
+      
+    } catch (e) {
+      ErrorHandler.showErrorSnackBar(context, 'Erro ao gerar relatório: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _generateDocumentReportFallback() async {
+    try {
+      final storeProvider = Provider.of<StoreProvider>(context, listen: false);
+      final documentProvider = Provider.of<DocumentProvider>(context, listen: false);
+      
+      final selectedStore = storeProvider.selectedStore;
+      if (selectedStore == null) {
+        ErrorHandler.showErrorSnackBar(context, 'Nenhuma loja selecionada');
+        return;
+      }
+
+      await documentProvider.fetchDocuments();
+      
+      // Filtrar documentos por período
+      final allDocuments = documentProvider.documents;
+      final filteredDocuments = allDocuments.where((doc) {
+        try {
+          final docDate = DateTime.parse(doc.date);
+          return docDate.isAfter(_startDate.subtract(const Duration(days: 1))) &&
+                 docDate.isBefore(_endDate.add(const Duration(days: 1)));
+        } catch (e) {
+          return false;
+        }
+      }).toList();
+
+      if (filteredDocuments.isEmpty) {
+        ErrorHandler.showErrorSnackBar(context, 'Nenhum documento encontrado no período selecionado');
+        return;
+      }
+
+      final reportContent = await SimpleReportService.generateDocumentReport(
+        documents: filteredDocuments,
+        store: selectedStore,
+        title: 'Relatório de Documentos - ${selectedStore.name}',
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+
+      await SimpleReportService.showReportDialog(
+        context,
+        reportContent,
+        'Relatório de Documentos'
+      );
+      
+    } catch (e) {
+      ErrorHandler.showErrorSnackBar(context, 'Erro ao gerar relatório: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _generateFinancialReportFallback() async {
+    try {
+      final storeProvider = Provider.of<StoreProvider>(context, listen: false);
+      final documentProvider = Provider.of<DocumentProvider>(context, listen: false);
+      
+      final selectedStore = storeProvider.selectedStore;
+      if (selectedStore == null) {
+        ErrorHandler.showErrorSnackBar(context, 'Nenhuma loja selecionada');
+        return;
+      }
+
+      await documentProvider.fetchDocuments();
+      
+      // Filtrar documentos por período
+      final allDocuments = documentProvider.documents;
+      final filteredDocuments = allDocuments.where((doc) {
+        try {
+          final docDate = DateTime.parse(doc.date);
+          return docDate.isAfter(_startDate.subtract(const Duration(days: 1))) &&
+                 docDate.isBefore(_endDate.add(const Duration(days: 1)));
+        } catch (e) {
+          return false;
+        }
+      }).toList();
+
+      final reportContent = await SimpleReportService.generateFinancialReport(
+        documents: filteredDocuments,
+        store: selectedStore,
+        startDate: _startDate,
+        endDate: _endDate,
+        title: 'Relatório Financeiro - ${selectedStore.name}',
+      );
+
+      await SimpleReportService.showReportDialog(
+        context,
+        reportContent,
+        'Relatório Financeiro'
+      );
+      
+    } catch (e) {
+      ErrorHandler.showErrorSnackBar(context, 'Erro ao gerar relatório: $e');
       rethrow;
     }
   }
@@ -333,6 +507,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                 value: 'inventory',
                                 child: Text('Inventário'),
                               ),
+                              DropdownMenuItem(
+                                value: 'financial',
+                                child: Text('Relatório Financeiro'),
+                              ),
                             ],
                             onChanged: (value) {
                               if (value != null) {
@@ -361,28 +539,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _selectDate(context, true),
-                                  icon: const Icon(Icons.calendar_today),
-                                  label: Text(
-                                    'De: ${_startDate.toString().split(' ')[0]}',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _selectDate(context, false),
-                                  icon: const Icon(Icons.calendar_today),
-                                  label: Text(
-                                    'Até: ${_endDate.toString().split(' ')[0]}',
-                                  ),
-                                ),
-                              ),
-                            ],
+                          OutlinedButton.icon(
+                            onPressed: _selectDateRange,
+                            icon: const Icon(Icons.date_range),
+                            label: Text(
+                              'Período: ${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}',
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            ),
                           ),
                         ],
                       ),

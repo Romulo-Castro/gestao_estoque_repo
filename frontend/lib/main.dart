@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 // Importar Providers
 import 'providers/auth_provider.dart';
 import 'providers/store_provider.dart';
+import 'providers/dashboard_provider.dart';
+import 'providers/layout_provider.dart';
 import 'providers/item_group_provider.dart';
 import 'providers/customer_provider.dart';
 import 'providers/supplier_provider.dart';
@@ -29,6 +31,7 @@ import 'screens/edit_document_screen.dart';
 import 'screens/document_detail_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/app_info_screen.dart';
 
 // Importar Utilitários e Preferências
 import 'utils/app_prefs.dart';
@@ -61,6 +64,7 @@ class AppRoutes {
   // Novas rotas
   static const reports = '/reports';
   static const settings = '/settings';
+  static const appInfo = '/app-info'; // Nova rota para informações do app
 }
 
 // --- Ponto de Entrada Principal ---
@@ -85,9 +89,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         // Provider para Autenticação
-        ChangeNotifierProvider(create: (_) => AuthProvider(apiService)),
-
-        ChangeNotifierProxyProvider<AuthProvider, StoreProvider>(
+        ChangeNotifierProvider(create: (_) => AuthProvider(apiService)),        ChangeNotifierProxyProvider<AuthProvider, StoreProvider>(
           create: (_) => StoreProvider(),
           update: (context, auth, previous) {
             final provider = previous ?? StoreProvider();
@@ -95,6 +97,15 @@ class MyApp extends StatelessWidget {
             return provider;
           },
         ),
+        ChangeNotifierProxyProvider<AuthProvider, DashboardProvider>(
+          create: (_) => DashboardProvider(),
+          update: (context, auth, previous) {
+            final provider = previous ?? DashboardProvider();
+            provider.updateAuthToken(auth.token);
+            return provider;
+          },        ),
+        // Layout Provider - não precisa de ProxyProvider pois não depende de autenticação
+        ChangeNotifierProvider(create: (_) => LayoutProvider()),
         ChangeNotifierProxyProvider<AuthProvider, ItemGroupProvider>(
           create: (_) => ItemGroupProvider(),
           update: (context, auth, previous) {
@@ -118,11 +129,10 @@ class MyApp extends StatelessWidget {
             provider.updateAuthToken(auth.token);
             return provider;
           },
-        ),
-        ChangeNotifierProxyProvider<AuthProvider, DocumentProvider>(
-          create: (_) => DocumentProvider(apiService, null, null),
+        ),        ChangeNotifierProxyProvider<AuthProvider, DocumentProvider>(
+          create: (_) => DocumentProvider(),
           update: (context, auth, previous) {
-            final provider = previous ?? DocumentProvider(apiService, auth.token, []);
+            final provider = previous ?? DocumentProvider();
             provider.updateAuthToken(auth.token);
             return provider;
           },
@@ -239,6 +249,7 @@ class MyApp extends StatelessWidget {
           // Novas rotas
           AppRoutes.reports: (context) => const ReportsScreen(),
           AppRoutes.settings: (context) => const SettingsScreen(),
+          AppRoutes.appInfo: (context) => const AppInfoScreen(), // Rota para informações do app
         },
       ),
     );

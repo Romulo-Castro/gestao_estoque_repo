@@ -2,308 +2,259 @@
 import 'package:flutter/foundation.dart';
 import '/models/document_model.dart';
 import '/services/api_service.dart';
+import '/utils/error_handler.dart';
 
-class DocumentProvider with ChangeNotifier {
-  final ApiService _apiService;
-  String? _authToken;
+class DocumentProvider with ChangeNotifier, ErrorHandlingMixin {
+  final ApiService _apiService = ApiService();
   int? _storeId;
   List<Document> _documents = [];
-  bool _isLoading = false;
-  String? _error;
-
-  DocumentProvider(this._apiService, this._authToken, List<Document>? initialDocuments) {
-    if (initialDocuments != null) {
-      _documents = initialDocuments;
-    }
-  }
+  Document? _currentDocument;
 
   List<Document> get documents => _documents;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
+  Document? get currentDocument => _currentDocument;
 
+  DocumentProvider() {
+    debugPrint("DocumentProvider inicializado.");
+  }
+
+  // Método para atualizar o token de autenticação
   void updateAuthToken(String? token) {
-    _authToken = token;
     _apiService.setAuthToken(token);
+    debugPrint("[DocumentProvider] Token atualizado: ${token != null ? 'presente' : 'nulo'}");
   }
 
+  // Método para definir o ID da loja atual
   void setStoreId(int? storeId) {
+    if (_storeId == storeId) return;
     _storeId = storeId;
+    _documents.clear();
+    _currentDocument = null;
+    clearError();
+    notifyListeners();
+    debugPrint("[DocumentProvider] Store ID definido: $storeId");
+
+    if (storeId != null) {
+      fetchDocuments();
+    }
   }
 
+  /// Buscar todos os documentos da loja
   Future<void> fetchDocuments() async {
-    if (_authToken == null) {
-      _error = 'Não autorizado';
-      notifyListeners();
-      return;
-    }
-
     if (_storeId == null) {
-      _error = 'Nenhuma loja selecionada';
-      notifyListeners();
+      setError('ID da loja não definido', 'fetchDocuments');
       return;
     }
 
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      final response = await _apiService.fetchDocuments(_storeId!);
-      _documents = response;
-      _error = null;
-    } catch (e) {
-      _error = 'Erro ao carregar documentos: ${e.toString()}';
-      debugPrint(_error);
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    await handleAsyncOperation(() async {
+      _documents = await _apiService.fetchDocuments(_storeId!);
+      debugPrint("[DocumentProvider] ${_documents.length} documentos carregados");
+    }, 'fetchDocuments');
   }
 
-  Future<Document?> fetchDocumentById(String id) async {
-    if (_authToken == null) {
-      _error = 'Não autorizado';
-      notifyListeners();
-      return null;
-    }
-
+  /// Buscar documento específico por ID
+  Future<Document?> fetchDocumentById(int documentId) async {
     if (_storeId == null) {
-      _error = 'Nenhuma loja selecionada';
-      notifyListeners();
+      setError('ID da loja não definido', 'fetchDocumentById');
       return null;
     }
 
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      final document = await _apiService.fetchDocumentById(_storeId!, int.parse(id));
-      _error = null;
+    return await handleAsyncOperation(() async {
+      final document = await _apiService.fetchDocumentById(_storeId!, documentId);
+      _currentDocument = document;
+      debugPrint("[DocumentProvider] Documento $documentId carregado");
       return document;
-    } catch (e) {
-      _error = 'Erro ao carregar documento: ${e.toString()}';
-      debugPrint(_error);
-      return null;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    }, 'fetchDocumentById');
   }
 
-  Future<bool> createDocument(Document document) async {
-    if (_authToken == null) {
-      _error = 'Não autorizado';
-      notifyListeners();
-      return false;
-    }
-
+  /// Criar novo documento
+  Future<Document?> createDocument(Document document) async {
     if (_storeId == null) {
-      _error = 'Nenhuma loja selecionada';
-      notifyListeners();
-      return false;
+      setError('ID da loja não definido', 'createDocument');
+      return null;
     }
 
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
+    return await handleAsyncOperation(() async {
       final newDocument = await _apiService.createDocument(_storeId!, document);
       _documents.add(newDocument);
-      _error = null;
-      return true;
-    } catch (e) {
-      _error = 'Erro ao criar documento: ${e.toString()}';
-      debugPrint(_error);
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+      _currentDocument = newDocument;
+      debugPrint("[DocumentProvider] Documento criado: ${newDocument.id}");
+      return newDocument;
+    }, 'createDocument');
   }
 
-  Future<bool> updateDocument(Document document) async {
-    if (_authToken == null) {
-      _error = 'Não autorizado';
-      notifyListeners();
-      return false;
-    }
-
+  /// Atualizar cabeçalho do documento
+  Future<Document?> updateDocumentHeader(int documentId, Document document) async {
     if (_storeId == null) {
-      _error = 'Nenhuma loja selecionada';
-      notifyListeners();
-      return false;
+      setError('ID da loja não definido', 'updateDocumentHeader');
+      return null;
     }
 
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      final updatedDocument = await _apiService.updateDocumentHeader(_storeId!, int.parse(document.id), document);
-      final index = _documents.indexWhere((d) => d.id == document.id);
+    return await handleAsyncOperation(() async {
+      final updatedDocument = await _apiService.updateDocumentHeader(
+        _storeId!, 
+        documentId, 
+        document
+      );
+        // Atualizar na lista local
+      final index = _documents.indexWhere((d) => d.id == documentId.toString());
       if (index != -1) {
         _documents[index] = updatedDocument;
       }
-      _error = null;
-      return true;
-    } catch (e) {
-      _error = 'Erro ao atualizar documento: ${e.toString()}';
-      debugPrint(_error);
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Future<bool> deleteDocument(String id) async {
-    if (_authToken == null) {
-      _error = 'Não autorizado';
-      notifyListeners();
-      return false;
-    }
-
+      
+      if (_currentDocument?.id == documentId.toString()) {
+        _currentDocument = updatedDocument;
+      }
+      
+      debugPrint("[DocumentProvider] Documento $documentId atualizado");
+      return updatedDocument;
+    }, 'updateDocumentHeader');
+  }  /// Atualizar status do documento
+  Future<Document?> updateDocumentStatus(int documentId, String status) async {
     if (_storeId == null) {
-      _error = 'Nenhuma loja selecionada';
-      notifyListeners();
-      return false;
+      setError('ID da loja não definido', 'updateDocumentStatus');
+      return null;
     }
 
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      await _apiService.cancelDocument(_storeId!, int.parse(id));
-      _documents.removeWhere((d) => d.id == id);
-      _error = null;
-      return true;
-    } catch (e) {
-      _error = 'Erro ao excluir documento: ${e.toString()}';
-      debugPrint(_error);
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    return await handleAsyncOperation(() async {
+      // Usar o novo método da API
+      final updatedDocument = await _apiService.updateDocumentStatus(_storeId!, documentId, status);
+      
+      // Atualizar na lista local
+      final index = _documents.indexWhere((d) => d.id == documentId.toString());
+      
+      if (index != -1) {
+        _documents[index] = updatedDocument;
+      }
+      
+      if (_currentDocument?.id == documentId.toString()) {
+        _currentDocument = updatedDocument;
+      }
+      
+      debugPrint("[DocumentProvider] Status do documento $documentId atualizado para: $status");
+      return updatedDocument;
+    }, 'updateDocumentStatus');
   }
 
-  Future<bool> processDocument(String id) async {
-    if (_authToken == null) {
-      _error = 'Não autorizado';
-      notifyListeners();
-      return false;
-    }
-
+  /// Atualizar documento completo
+  Future<Document?> updateDocument(int documentId, Document document) async {
     if (_storeId == null) {
-      _error = 'Nenhuma loja selecionada';
-      notifyListeners();
-      return false;
+      setError('ID da loja não definido', 'updateDocument');
+      return null;
     }
 
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      // processDocument doesn't return the document, just call the endpoint
-      await _apiService.processDocument(_storeId!, int.parse(id));
-      // Optionally update local status if needed, or refetch documents
-      // final idx = _documents.indexWhere((d) => d.id == id);
-      // if (idx != -1) { /* update status or refetch document */ }
-      _error = null;
-      return true;
-    } catch (e) {
-      _error = 'Erro ao processar documento: ${e.toString()}';
-      debugPrint(_error);
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    return await handleAsyncOperation(() async {
+      final updatedDocument = await _apiService.updateDocument(_storeId!, documentId, document);
+      
+      // Atualizar na lista local
+      final index = _documents.indexWhere((d) => d.id == documentId.toString());
+      if (index != -1) {
+        _documents[index] = updatedDocument;
+      }
+      
+      if (_currentDocument?.id == documentId.toString()) {
+        _currentDocument = updatedDocument;
+      }
+      
+      debugPrint("[DocumentProvider] Documento $documentId atualizado");
+      return updatedDocument;
+    }, 'updateDocument');
   }
 
-  Future<bool> cancelDocument(String id) async {
-    if (_authToken == null) {
-      _error = 'Não autorizado';
-      notifyListeners();
-      return false;
-    }
-
+  /// Cancelar documento
+  Future<void> cancelDocument(int documentId) async {
     if (_storeId == null) {
-      _error = 'Nenhuma loja selecionada';
-      notifyListeners();
-      return false;
+      setError('ID da loja não definido', 'cancelDocument');
+      return;
     }
 
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    await handleAsyncOperation(() async {
+      await _apiService.cancelDocument(_storeId!, documentId);
+      
+      // Atualizar na lista local
+      final index = _documents.indexWhere((d) => d.id == documentId.toString());
+      if (index != -1) {
+        _documents[index] = _documents[index].copyWith(status: 'CANCELADO');
+      }
+      
+      if (_currentDocument?.id == documentId.toString()) {
+        _currentDocument = _currentDocument!.copyWith(status: 'CANCELADO');
+      }
+      
+      debugPrint("[DocumentProvider] Documento $documentId cancelado");
+    }, 'cancelDocument');
+  }
 
-    try {
-      await _apiService.cancelDocument(_storeId!, int.parse(id));
-      _documents.removeWhere((d) => d.id == id);
-      _error = null;
-      return true;
-    } catch (e) {
-      _error = 'Erro ao cancelar documento: ${e.toString()}';
-      debugPrint(_error);
-      return false;
-    } finally {
-      _isLoading = false;
+  /// Buscar documentos com filtros
+  Future<void> fetchDocumentsWithFilters(Map<String, dynamic> filters) async {
+    if (_storeId == null) {
+      setError('ID da loja não definido', 'fetchDocumentsWithFilters');
+      return;
+    }
+
+    await handleAsyncOperation(() async {
+      _documents = await _apiService.fetchDocumentsWithFilters(_storeId!, filters);
+      debugPrint("[DocumentProvider] ${_documents.length} documentos carregados com filtros");
+    }, 'fetchDocumentsWithFilters');
+  }
+  /// Deletar documento
+  Future<void> deleteDocument(int documentId) async {
+    if (_storeId == null) {
+      setError('ID da loja não definido', 'deleteDocument');
+      return;
+    }
+
+    await handleAsyncOperation(() async {
+      await _apiService.deleteDocument(_storeId!, documentId);
+      
+      // Remover da lista local
+      _documents.removeWhere((d) => d.id == documentId.toString());
+      
+      if (_currentDocument?.id == documentId.toString()) {
+        _currentDocument = null;
+      }
+      
+      debugPrint("[DocumentProvider] Documento $documentId deletado");
+    }, 'deleteDocument');
+  }
+
+  /// Limpar documento atual
+  void clearCurrentDocument() {
+    if (_currentDocument != null) {
+      _currentDocument = null;
       notifyListeners();
     }
   }
-
-  List<Document> getDocumentsByType(DocumentType type) {
-    return _documents.where((doc) => doc.type == type).toList();
+  /// Buscar documentos por tipo (ex: 'entrada', 'saida')
+  List<Document> getDocumentsByType(String type) {
+    final documentType = stringToDocumentType(type);
+    return _documents.where((doc) => doc.type == documentType).toList();
   }
 
+  /// Buscar documentos por status
   List<Document> getDocumentsByStatus(String status) {
     return _documents.where((doc) => doc.status == status).toList();
   }
-
+  /// Buscar documentos por período
   List<Document> getDocumentsByDateRange(DateTime start, DateTime end) {
     return _documents.where((doc) {
-      final docDate = DateTime.parse(doc.date);
-      return docDate.isAfter(start) && docDate.isBefore(end);
+      try {
+        final docDate = DateTime.parse(doc.date);
+        return docDate.isAfter(start.subtract(const Duration(days: 1))) &&
+               docDate.isBefore(end.add(const Duration(days: 1)));
+      } catch (e) {
+        debugPrint("Erro ao analisar data do documento ${doc.id}: ${doc.date}");
+        return false;
+      }
     }).toList();
   }
 
-  // Fetch documents with filters
-  Future<void> fetchDocumentsWithFilters(Map<String, dynamic> filters) async {
-    if (_authToken == null) {
-      _error = 'Não autorizado';
-      notifyListeners();
-      return;
-    }
-    if (_storeId == null) {
-      _error = 'Nenhuma loja selecionada';
-      notifyListeners();
-      return;
-    }
-    _isLoading = true;
-    _error = null;
+  /// Limpar todos os dados (útil para logout)
+  void clearAll() {
+    _documents.clear();
+    _currentDocument = null;
+    _storeId = null;
+    clearError();
     notifyListeners();
-
-    try {
-      final response = await _apiService.fetchDocumentsWithFilters(_storeId!, filters);
-      _documents = response;
-      _error = null;
-    } catch (e) {
-      _error = 'Erro ao filtrar documentos: ${e.toString()}';
-      debugPrint(_error);
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  void clearError() {
-    _error = null;
-    notifyListeners();
+    debugPrint("[DocumentProvider] Todos os dados limpos");
   }
 }
-
