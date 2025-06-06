@@ -11,7 +11,6 @@ import "/providers/item_group_provider.dart"; // Importar provider de grupo
 import "/services/api_service.dart";
 import "/utils/app_prefs.dart";
 import "package:image_picker/image_picker.dart";
-import 'package:mobile_scanner/mobile_scanner.dart';
 import '../widgets/barcode_scanner_page.dart';
 import 'package:file_picker/file_picker.dart';
 

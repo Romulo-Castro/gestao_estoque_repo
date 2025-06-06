@@ -11,11 +11,13 @@ class BarcodeScannerPage extends StatelessWidget {
         title: const Text('Escanear Código de Barras'),
       ),
       body: MobileScanner(
-        allowDuplicates: false,
-        onDetect: (Barcode barcode, MobileScannerArguments? args) {
-          final code = barcode.rawValue;
-          if (code != null && context.mounted) {
-            Navigator.of(context).pop(code);
+        onDetect: (capture) {
+          final barcodes = capture.barcodes;
+          if (barcodes.isNotEmpty) {
+            final code = barcodes.first.rawValue;
+            if (code != null && context.mounted) {
+              Navigator.of(context).pop(code);
+            }
           }
         },
       ),

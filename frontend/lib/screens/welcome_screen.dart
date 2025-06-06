@@ -267,7 +267,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   backgroundColor: Colors.teal[600],
                   contentPadding: EdgeInsets.zero,
                   content: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Align(alignment: Alignment.topRight, child: IconButton(icon: Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.of(context).pop())),
+                    Align(alignment: Alignment.topRight, child: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.of(context).pop())),
                     Image.file(File(picked.path)),
                     TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('FECHAR', style: TextStyle(color: Colors.white))),
                   ]),
@@ -290,7 +290,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           if (icon != null) ...[
             Container(
               margin: const EdgeInsets.only(top: 40, bottom: 24),
-              child: Icon(icon, size: 180, color: Colors.white, shadows: [const Shadow(color: Colors.black26, blurRadius: 4)]),
+              child: Icon(icon, size: 180, color: Colors.white, shadows: const [Shadow(color: Colors.black26, blurRadius: 4)]),
             ),
           ],
           Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),

@@ -5,11 +5,11 @@ import '/main.dart'; // Para AppRoutes
 import '/providers/store_provider.dart';
 import '/widgets/app_drawer.dart'; // Importar o Drawer
 import '/widgets/home_card.dart'; // Importar o Card
+import '/widgets/barcode_scanner_page.dart'; // Importar o scanner
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  // Helper para mostrar snackbar de TODO
+  // Helper para mostrar snackbar de funcionalidades não implementadas
   void _showTodoSnackbar(BuildContext context, String featureName) {
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -181,18 +181,16 @@ class HomeScreen extends StatelessWidget {
                 icon: Icons.receipt_long_outlined,
                 iconColor: Colors.orange[700],
                 onTap: () => Navigator.pushNamed(context, AppRoutes.documentList),
-              ),
-              HomeCard(
+              ),              HomeCard(
                 title: "Relatórios",
                 icon: Icons.assessment_outlined,
                 iconColor: Colors.blue[700],
-                onTap: () => _showTodoSnackbar(context, "Relatórios"), // TODO
-              ),
-              HomeCard(
+                onTap: () => Navigator.pushNamed(context, AppRoutes.reports),
+              ),              HomeCard(
                 title: "Despesas",
                 icon: Icons.wallet_outlined,
                 iconColor: Colors.red[700],
-                onTap: () => _showTodoSnackbar(context, "Despesas"), // TODO
+                onTap: () => _showTodoSnackbar(context, "Despesas"), // Feature not implemented yet
               ),
               HomeCard(
                 title: "Nova Entrada",
@@ -213,18 +211,21 @@ class HomeScreen extends StatelessWidget {
                   AppRoutes.editDocument, 
                   arguments: {'type': 'SAIDA'}
                 ),
-              ),
-              HomeCard(
+              ),              HomeCard(
                 title: "Ler Código",
                 icon: Icons.qr_code_scanner_outlined,
                 iconColor: Colors.purple[700],
-                onTap: () => _showTodoSnackbar(context, "Leitor de Código"), // TODO
-              ),
-              HomeCard(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const BarcodeScannerPage(),
+                  ),
+                ),
+              ),              HomeCard(
                 title: "Ajuda",
                 icon: Icons.help_outline_outlined,
                 iconColor: Colors.teal[700],
-                onTap: () => _showTodoSnackbar(context, "Ajuda"), // TODO
+                onTap: () => _showTodoSnackbar(context, "Ajuda"), // Feature not implemented yet
               ),
               HomeCard(
                 title: "Clientes",
@@ -243,12 +244,11 @@ class HomeScreen extends StatelessWidget {
                 icon: Icons.category_outlined,
                 iconColor: Colors.amber[700],
                 onTap: () => Navigator.pushNamed(context, AppRoutes.itemGroupList),
-              ),
-              HomeCard(
+              ),              HomeCard(
                 title: "Configurações",
                 icon: Icons.settings_outlined,
                 iconColor: Colors.grey[700],
-                onTap: () => _showTodoSnackbar(context, "Configurações"), // TODO
+                onTap: () => _showTodoSnackbar(context, "Configurações"), // Feature not implemented yet
               ),
             ],
           ),

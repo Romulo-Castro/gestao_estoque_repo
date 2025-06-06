@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '/providers/document_provider.dart';
 import '/providers/stock_provider.dart';
+import '/providers/store_provider.dart';
 import '/utils/app_prefs.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -137,18 +138,152 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<void> _generateStockMovementReport(StockProvider provider) async {
-    // TODO: Implement stock movement report generation
-    await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+    try {
+      final storeProvider = Provider.of<StoreProvider>(context, listen: false);
+      final currentStore = storeProvider.selectedStore;
+      
+      if (currentStore == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Selecione uma loja primeiro"),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      await provider.fetchStockItems();
+      final items = provider.items;
+      
+      if (items.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Nenhum item em estoque encontrado"),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Generate a simple stock movement report
+      String reportContent = "RELATÓRIO DE MOVIMENTAÇÃO DE ESTOQUE\n";
+      reportContent += "Loja: ${currentStore.name}\n";
+      reportContent += "Data: ${DateTime.now().toString().split(' ')[0]}\n\n";
+      reportContent += "ITENS EM ESTOQUE:\n";
+      
+      for (var item in items) {
+        reportContent += "${item.name} - Qtd: ${item.quantity} - Preço: R\$ ${item.price?.toStringAsFixed(2) ?? 'N/A'}\n";
+      }
+
+      // Here you would typically save or share the report
+      debugPrint(reportContent);
+      
+    } catch (e) {
+      debugPrint("Erro ao gerar relatório: $e");
+      rethrow;
+    }
   }
 
   Future<void> _generateDocumentReport(DocumentProvider provider) async {
-    // TODO: Implement document report generation
-    await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+    try {
+      final storeProvider = Provider.of<StoreProvider>(context, listen: false);
+      final currentStore = storeProvider.selectedStore;
+      
+      if (currentStore == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Selecione uma loja primeiro"),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      await provider.fetchDocuments();
+      final documents = provider.documents;
+      
+      if (documents.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Nenhum documento encontrado"),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Generate document report
+      String reportContent = "RELATÓRIO DE DOCUMENTOS\n";
+      reportContent += "Loja: ${currentStore.name}\n";
+      reportContent += "Data: ${DateTime.now().toString().split(' ')[0]}\n\n";
+      reportContent += "DOCUMENTOS:\n";
+      
+      for (var doc in documents) {
+        reportContent += "${doc.type.toString().split('.').last} - ${doc.number} - ${doc.date.toString().split(' ')[0]}\n";
+      }
+
+      debugPrint(reportContent);
+      
+    } catch (e) {
+      debugPrint("Erro ao gerar relatório de documentos: $e");
+      rethrow;
+    }
   }
 
   Future<void> _generateInventoryReport(StockProvider provider) async {
-    // TODO: Implement inventory report generation
-    await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+    try {
+      final storeProvider = Provider.of<StoreProvider>(context, listen: false);
+      final currentStore = storeProvider.selectedStore;
+      
+      if (currentStore == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Selecione uma loja primeiro"),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      await provider.fetchStockItems();
+      final items = provider.items;
+      
+      // Generate inventory report with totals
+      String reportContent = "RELATÓRIO DE INVENTÁRIO\n";
+      reportContent += "Loja: ${currentStore.name}\n";
+      reportContent += "Data: ${DateTime.now().toString().split(' ')[0]}\n\n";
+      
+      double totalValue = 0.0;
+      int totalItems = 0;
+      
+      reportContent += "INVENTÁRIO COMPLETO:\n";
+      for (var item in items) {
+        final itemValue = (item.price ?? 0.0) * item.quantity;
+        totalValue += itemValue;
+        totalItems++;
+        reportContent += "${item.name} - Qtd: ${item.quantity} - Valor Total: R\$ ${itemValue.toStringAsFixed(2)}\n";
+      }
+      
+      reportContent += "\nRESUMO:\n";
+      reportContent += "Total de itens: $totalItems\n";
+      reportContent += "Valor total do inventário: R\$ ${totalValue.toStringAsFixed(2)}\n";
+
+      debugPrint(reportContent);
+      
+    } catch (e) {
+      debugPrint("Erro ao gerar relatório de inventário: $e");
+      rethrow;
+    }
   }
 
   @override

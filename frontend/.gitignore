@@ -4,6 +4,7 @@ build/
 .packages
 .flutter-plugins
 .flutter-plugins-dependencies
+.metadata
 
 # Configurações específicas de IDE
 .idea/
@@ -20,3 +21,28 @@ build/
 .melody_tool/
 .melos_tool/
 lib.zip
+
+# Flutter específicos
+pubspec.lock
+**/Generated.xcconfig
+**/flutter_export_environment.sh
+
+# iOS específico
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# Android específico
+**/android/.gradle/
+**/android/local.properties
+**/android/app/.cxx/
+**/android/gradle-wrapper.jar
+
+# Platform-specific ephemeral files
+**/flutter/ephemeral/
+**/linux/flutter/ephemeral/
+**/macos/Flutter/ephemeral/
+**/windows/flutter/ephemeral/

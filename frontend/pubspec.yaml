@@ -1,3 +1,4 @@
+# Removed the $schema directive to disable remote schema loading
 name: frontend
 description: "Aplicativo de gestão de estoques"
 publish_to: 'none'
@@ -21,7 +22,7 @@ dependencies:
   provider: ^6.1.2
   flutter_secure_storage: ^9.2.2
   intl: ^0.18.1
-  mobile_scanner: ^2.0.0
+  mobile_scanner: ^7.0.1
   file_picker: ^10.1.9
 
 dev_dependencies:

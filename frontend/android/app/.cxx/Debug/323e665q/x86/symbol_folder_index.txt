@@ -1,1 +1,0 @@
-C:\gestao_estoque_repo\frontend\build\app\intermediates\cxx\Debug\323e665q\obj\x86

@@ -7,8 +7,7 @@ import '../providers/store_provider.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
-
-  // Helper para mostrar snackbar de TODO
+  // Helper para mostrar snackbar de funcionalidades não implementadas
   void _showTodoSnackbar(BuildContext context, String featureName) {
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
