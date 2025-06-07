@@ -3,39 +3,45 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 // Importar Providers
-import 'providers/auth_provider.dart';
-import 'providers/store_provider.dart';
-import 'providers/dashboard_provider.dart';
-import 'providers/layout_provider.dart';
-import 'providers/item_group_provider.dart';
-import 'providers/customer_provider.dart';
-import 'providers/supplier_provider.dart';
-import 'providers/document_provider.dart';
-import 'providers/stock_provider.dart';
+import 'core/presentation/providers/auth_provider.dart';
+import 'core/presentation/providers/store_provider.dart';
+import 'core/presentation/providers/dashboard_provider.dart';
+import 'core/presentation/providers/layout_provider.dart';
+import 'core/presentation/providers/item_group_provider.dart';
+import 'core/presentation/providers/customer_provider.dart';
+import 'core/presentation/providers/supplier_provider.dart';
+import 'core/presentation/providers/document_provider.dart';
+import 'core/presentation/providers/stock_provider.dart';
 
 // Importar Telas
-import 'screens/login_screen.dart';
-import 'screens/register_screen.dart';
-import 'screens/stock_screen.dart';
-import 'screens/welcome_screen.dart';
-import 'screens/store_management_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/item_group_list_screen.dart';
-import 'screens/edit_item_group_screen.dart';
-import 'screens/customer_list_screen.dart';
-import 'screens/edit_customer_screen.dart';
-import 'screens/supplier_list_screen.dart';
-import 'screens/edit_supplier_screen.dart';
-import 'screens/document_list_screen.dart';
-import 'screens/edit_document_screen.dart';
-import 'screens/document_detail_screen.dart';
-import 'screens/reports_screen.dart';
-import 'screens/settings_screen.dart';
-import 'screens/app_info_screen.dart';
+import 'core/presentation/screens/login_screen.dart';
+import 'core/presentation/screens/register_screen.dart';
+import 'core/presentation/screens/stock_screen.dart';
+import 'core/presentation/screens/welcome_screen.dart';
+import 'core/presentation/screens/store_management_screen.dart';
+import 'core/presentation/screens/home_screen.dart';
+import 'core/presentation/screens/item_group_list_screen.dart';
+import 'core/presentation/screens/edit_item_group_screen.dart';
+import 'core/presentation/screens/customer_list_screen.dart';
+import 'core/presentation/screens/edit_customer_screen.dart';
+import 'core/presentation/screens/supplier_list_screen.dart';
+import 'core/presentation/screens/edit_supplier_screen.dart';
+import 'core/presentation/screens/document_list_screen.dart';
+import 'core/presentation/screens/edit_document_screen.dart';
+import 'core/presentation/screens/document_detail_screen.dart';
+import 'core/presentation/screens/reports_screen.dart';
+import 'core/presentation/screens/settings_screen.dart';
+import 'core/presentation/screens/app_info_screen.dart';
+import 'core/presentation/screens/bulk_import_screen.dart';
+import 'core/presentation/screens/expenses_screen.dart';
+import 'core/presentation/screens/help_screen.dart';
 
 // Importar Utilitários e Preferências
-import 'utils/app_prefs.dart';
-import 'services/api_service.dart';
+import 'shared/utils/app_prefs.dart';
+import 'core/data/datasources/api_service.dart';
+
+// Clean Architecture
+import 'shared/dependency_injection.dart';
 
 // --- Constantes de Rotas Nomeadas ---
 // Centraliza os nomes das rotas para evitar erros de digitação
@@ -65,6 +71,9 @@ class AppRoutes {
   static const reports = '/reports';
   static const settings = '/settings';
   static const appInfo = '/app-info'; // Nova rota para informações do app
+  static const bulkImport = '/bulk-import'; // Nova rota para importação de mercadorias
+  static const expenses = '/expenses'; // Nova rota para despesas
+  static const help = '/help'; // Nova rota para ajuda
 }
 
 // --- Ponto de Entrada Principal ---
@@ -72,6 +81,9 @@ void main() async {
   // Necessário para garantir que plugins (como SharedPreferences) sejam inicializados
   // antes de `runApp` se você usar `await` antes dele (como fizemos em AppPrefs).
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Clean Architecture dependencies
+  await initializeDependencies();
 
   // Roda o widget raiz da aplicação
   runApp(const MyApp());
@@ -250,6 +262,9 @@ class MyApp extends StatelessWidget {
           AppRoutes.reports: (context) => const ReportsScreen(),
           AppRoutes.settings: (context) => const SettingsScreen(),
           AppRoutes.appInfo: (context) => const AppInfoScreen(), // Rota para informações do app
+          AppRoutes.bulkImport: (context) => const BulkImportScreen(), // Rota para importação de mercadorias
+          AppRoutes.expenses: (context) => const ExpensesScreen(), // Rota para despesas
+          AppRoutes.help: (context) => const HelpScreen(), // Rota para ajuda
         },
       ),
     );
@@ -259,8 +274,23 @@ class MyApp extends StatelessWidget {
 // --- Widgets de Controle de Fluxo ---
 
 // Decide entre Login ou (Welcome/Home Dashboard) baseado na autenticação
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize authentication when the app starts
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      authProvider.initializeAuth();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

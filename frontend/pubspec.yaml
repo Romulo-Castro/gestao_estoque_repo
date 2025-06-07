@@ -29,6 +29,9 @@ dependencies:
   path: ^1.8.3
   excel: ^4.0.6
   csv: ^6.0.0
+  # Clean Architecture dependencies
+  equatable: ^2.0.5
+  get_it: ^7.6.4
 
 dev_dependencies:
   flutter_test:

@@ -84,11 +84,10 @@ async function createTables() {
             FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
             -- UNIQUE(store_id, email) WHERE email IS NOT NULL -- Opcional
             -- UNIQUE(store_id, name) -- Opcional
-        );`,
-        // --- Documentos (Entradas/Saídas) ---
+        );`,        // --- Documentos (Entradas/Saídas) ---
         `CREATE TABLE IF NOT EXISTS documents (
             id INTEGER PRIMARY KEY AUTOINCREMENT, store_id INTEGER NOT NULL,
-            type TEXT NOT NULL CHECK(type IN ('sale', 'purchase', 'adjustment_in', 'adjustment_out')),
+            type TEXT NOT NULL CHECK(type IN ('sale', 'purchase')),
             document_date DATE NOT NULL,
             customer_id INTEGER, -- Nulo se não for venda
             supplier_id INTEGER, -- Nulo se não for compra
@@ -259,13 +258,11 @@ async function createDocumentAndAdjustStock(documentData, documentItems) {
 
          for (const item of documentItems) {
              // Insere no document_items
-             await runQuery(itemInsertSql, [documentId, item.itemId, item.quantity, item.unitPrice]);
-
-             // Ajusta estoque em stock_items
+             await runQuery(itemInsertSql, [documentId, item.itemId, item.quantity, item.unitPrice]);             // Ajusta estoque em stock_items
              let quantityChange = 0;
-             if (documentData.type === 'purchase' || documentData.type === 'adjustment_in') {
+             if (documentData.type === 'purchase') {
                  quantityChange = item.quantity; // Aumenta estoque
-             } else if (documentData.type === 'sale' || documentData.type === 'adjustment_out') {
+             } else if (documentData.type === 'sale') {
                  quantityChange = -item.quantity; // Diminui estoque
                  // Opcional: Verificar se há estoque suficiente antes de diminuir
                  // const currentStock = await getQuery('SELECT quantity FROM stock_items WHERE id = ?', [item.itemId]);

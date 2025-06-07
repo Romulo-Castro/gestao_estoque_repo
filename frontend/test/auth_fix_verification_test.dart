@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/providers/auth_provider.dart';
 import 'package:frontend/services/api_service.dart';
@@ -14,9 +15,8 @@ void main() {
       // Create a test user
       final testEmail = 'auth_fix_test_${DateTime.now().millisecondsSinceEpoch}@example.com';
       const testPassword = 'password123';
-      const testName = 'Auth Fix Test User';
-
-      print('🧪 Testing AuthProvider.register()...');
+      const testName = 'Auth Fix Test User';      // Test logging (using debugPrint for tests)
+      debugPrint('🧪 Testing AuthProvider.register()...');
       
       try {
         final registerSuccess = await authProvider.register(testName, testEmail, testPassword);
@@ -27,13 +27,13 @@ void main() {
         expect(authProvider.user, isNotNull, reason: 'User should be set');
         expect(authProvider.user!.email, equals(testEmail), reason: 'User email should match');
         
-        print('✅ Registration works correctly!');
+        debugPrint('✅ Registration works correctly!');
         
         // Logout to test login separately
         await authProvider.logout();
         expect(authProvider.isAuthenticated, false, reason: 'Should not be authenticated after logout');
         
-        print('🧪 Testing AuthProvider.login()...');
+        debugPrint('🧪 Testing AuthProvider.login()...');
         
         // Test login
         final loginSuccess = await authProvider.login(testEmail, testPassword);
@@ -44,11 +44,11 @@ void main() {
         expect(authProvider.user, isNotNull, reason: 'User should be set after login');
         expect(authProvider.user!.email, equals(testEmail), reason: 'User email should match after login');
         
-        print('✅ Login works correctly!');
-        print('🎉 AuthProvider fix verified - no more "Resposta inválida do servidor" error!');
+        debugPrint('✅ Login works correctly!');
+        debugPrint('🎉 AuthProvider fix verified - no more "Resposta inválida do servidor" error!');
         
       } catch (e) {
-        print('❌ Test failed: $e');
+        debugPrint('❌ Test failed: $e');
         fail('AuthProvider test failed: $e');
       }
     });
@@ -57,7 +57,7 @@ void main() {
       final apiService = ApiService();
       final authProvider = AuthProvider(apiService);
       
-      print('🧪 Testing AuthProvider with invalid credentials...');
+      debugPrint('🧪 Testing AuthProvider with invalid credentials...');
       
       final loginSuccess = await authProvider.login('invalid@example.com', 'wrongpassword');
       
@@ -67,8 +67,8 @@ void main() {
       expect(authProvider.user, isNull, reason: 'User should be null after failed login');
       expect(authProvider.error, isNotNull, reason: 'Error should be set after failed login');
       
-      print('✅ Error handling works correctly!');
-      print('Error message: ${authProvider.error}');
+      debugPrint('✅ Error handling works correctly!');
+      debugPrint('Error message: ${authProvider.error}');
     });
   });
 }

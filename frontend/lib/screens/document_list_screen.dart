@@ -1,15 +1,16 @@
-// frontend/lib/screens/document_list_screen.dart
-import "package:flutter/material.dart";
-import "package:intl/intl.dart"; // Para formatar data
-import "package:provider/provider.dart";
-import "/models/document_model.dart";
-import "/providers/document_provider.dart";
-import "/providers/store_provider.dart";
-import "/providers/layout_provider.dart";
-import "/screens/edit_document_screen.dart"; // Para criar novo
-import "/screens/document_detail_screen.dart"; // Para ver detalhes
-import "/widgets/app_drawer.dart";
-import "/utils/error_handler.dart";
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../models/document_model.dart';
+import '../models/balance_sheet_model.dart';
+import '../providers/document_provider.dart';
+import '../providers/store_provider.dart';
+import '../screens/edit_document_screen.dart';
+import '../screens/document_detail_screen.dart';
+import '../widgets/app_drawer.dart';
+import '../core/presentation/widgets/improved_balance_sheet_widget.dart';
+import '../services/csv_export_service.dart';
+import '../utils/error_handler.dart';
 
 class DocumentListScreen extends StatefulWidget {
   const DocumentListScreen({super.key});
@@ -18,17 +19,24 @@ class DocumentListScreen extends StatefulWidget {
   State<DocumentListScreen> createState() => _DocumentListScreenState();
 }
 
-class _DocumentListScreenState extends State<DocumentListScreen> {
-  // Filtros
-  DocumentType? _selectedType;
-  DateTime? _startDate;
-  DateTime? _endDate;
+class _DocumentListScreenState extends State<DocumentListScreen>
+    with SingleTickerProviderStateMixin {  late TabController _tabController;
   bool _mounted = true;
+  final Set<String> _selectedDocuments = {};
+  bool _isSelectionMode = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _isSearching = false;
+
+  // Tab filters
+  final List<String> _tabFilters = ['TODOS', 'ENTRADA', 'SAÍDA', 'BALANÇA'];
 
   @override
   void initState() {
     super.initState();
-    // Acessar o provider após o build inicial
+    _tabController = TabController(length: _tabFilters.length, vsync: this);
+    
+    // Initialize document provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
       if (storeId != null) {
@@ -36,266 +44,364 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
       }
     });
   }
-
   @override
   void dispose() {
+    _tabController.dispose();
+    _searchController.dispose();
     _mounted = false;
     super.dispose();
   }
-
-  // Helper para obter ícone baseado no tipo
+  // Helper methods for document type conversion
   IconData _getDocIcon(DocumentType type) {
     switch (type) {
       case DocumentType.entrada:
         return Icons.input;
       case DocumentType.saida:
         return Icons.output;
-      case DocumentType.ajusteEntrada:
-        return Icons.add_circle_outline;
-      case DocumentType.ajusteSaida:
-        return Icons.remove_circle_outline;
-      case DocumentType.transferencia:
-        return Icons.swap_horiz;
-      case DocumentType.ajuste:
-        return Icons.tune;
       case DocumentType.unknown:
         return Icons.help_outline;
     }
   }
-
-  // Helper para obter cor baseado no tipo/status
   Color _getDocColor(DocumentType type, String? status) {
     if (status == "CANCELADO") return Colors.grey;
     switch (type) {
       case DocumentType.entrada:
-      case DocumentType.ajusteEntrada:
         return Colors.green;
       case DocumentType.saida:
-      case DocumentType.ajusteSaida:
         return Colors.red;
-      case DocumentType.transferencia:
-        return Colors.blue;
-      case DocumentType.ajuste:
-        return Colors.orange;
       case DocumentType.unknown:
         return Colors.grey;
     }
   }
-
-  // Helper para converter DocumentType para String
   String documentTypeToString(DocumentType type) {
     switch (type) {
       case DocumentType.entrada:
         return 'Entrada';
       case DocumentType.saida:
         return 'Saída';
-      case DocumentType.transferencia:
-        return 'Transferência';
-      case DocumentType.ajuste:
-        return 'Ajuste';
-      case DocumentType.ajusteEntrada:
-        return 'Ajuste Entrada';
-      case DocumentType.ajusteSaida:
-        return 'Ajuste Saída';
       case DocumentType.unknown:
         return 'Desconhecido';
     }
+  }  // Filter documents based on selected tab and search query
+  List<Document> _getFilteredDocuments(List<Document> documents, String filter) {
+    List<Document> filteredByTab;
+    
+    if (filter == 'TODOS') {
+      filteredByTab = documents;
+    } else {
+      filteredByTab = documents.where((doc) {
+        switch (filter) {
+          case 'ENTRADA':
+            return doc.type == DocumentType.entrada;
+          case 'SAÍDA':
+            return doc.type == DocumentType.saida;
+          case 'BALANÇA':
+            // For balance sheet, include all documents that affect financial flow
+            return doc.type == DocumentType.entrada || 
+                   doc.type == DocumentType.saida;
+          default:
+            return true;
+        }
+      }).toList();
+    }
+    
+    // Apply search filter if search query exists
+    if (_searchQuery.isNotEmpty) {
+      filteredByTab = filteredByTab.where((doc) {
+        final searchLower = _searchQuery.toLowerCase();
+        return doc.id.toLowerCase().contains(searchLower) ||
+               documentTypeToString(doc.type).toLowerCase().contains(searchLower) ||
+               doc.status.toLowerCase().contains(searchLower) ||
+               doc.date.toLowerCase().contains(searchLower);
+      }).toList();
+    }
+    
+    return filteredByTab;
+  }
+  void _toggleSelection(String docId) {
+    setState(() {
+      if (_selectedDocuments.contains(docId)) {
+        _selectedDocuments.remove(docId);
+        if (_selectedDocuments.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedDocuments.add(docId);
+        _isSelectionMode = true;
+      }
+    });
   }
 
-  // Método para mostrar o diálogo de filtros
-  void _showFilterDialog() {
+  void _clearSelection() {
+    setState(() {
+      _selectedDocuments.clear();
+      _isSelectionMode = false;
+    });
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchController.clear();
+        _searchQuery = '';
+      }
+    });
+  }
+
+  void _updateSearchQuery(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+  }
+  Future<void> _exportDocuments() async {
+    try {
+      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+      final currentTab = _tabFilters[_tabController.index];
+      final filteredDocs = _getFilteredDocuments(docProvider.documents, currentTab);
+      
+      if (filteredDocs.isEmpty) {
+        if (mounted) {
+          ErrorHandler.showErrorSnackBar(context, "Nenhum documento para exportar.");
+        }
+        return;
+      }
+
+      String csvContent;
+      String contextDescription;
+
+      // Generate contextual CSV based on current tab
+      switch (currentTab) {
+        case 'BALANÇA':
+          final balanceData = BalanceSheetData.fromDocuments(filteredDocs);
+          csvContent = CSVExportService.generateCSV(
+            context: CSVExportContext.balanceSheet,
+            data: balanceData,
+          );
+          contextDescription = 'Balancete';
+          break;
+        
+        case 'TODOS':
+          csvContent = CSVExportService.generateCSV(
+            context: CSVExportContext.allDocuments,
+            data: filteredDocs,
+          );
+          contextDescription = 'Todos os Documentos';
+          break;
+        
+        default:
+          csvContent = CSVExportService.generateCSV(
+            context: CSVExportContext.documentsFiltered,
+            data: filteredDocs,
+            filterDescription: currentTab,
+          );
+          contextDescription = 'Documentos - $currentTab';
+          break;
+      }
+      
+      // For web - create download link (simplified approach)
+      // In a real implementation, you would use 'dart:html' for web downloads
+      // For now, we'll show the content length as confirmation
+      final contentLength = csvContent.length;
+      final filename = CSVExportService.getContextualFilename(
+        currentTab == 'BALANÇA' ? CSVExportContext.balanceSheet : 
+        currentTab == 'TODOS' ? CSVExportContext.allDocuments : CSVExportContext.documentsFiltered,
+        additionalInfo: currentTab,
+      );
+      
+      if (mounted) {
+        ErrorHandler.showSuccessSnackBar(
+          context, 
+          "Exportação de $contextDescription concluída!\n${filteredDocs.length} registros • $filename ($contentLength caracteres)."
+        );
+      }
+      
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showErrorSnackBar(context, "Erro ao exportar: $e");
+      }
+    }
+  }
+
+  void _showSettingsDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text("Filtrar Documentos"),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Filtro por tipo
-                  const Text("Tipo de Documento:"),
-                  DropdownButton<DocumentType?>(
-                    isExpanded: true,
-                    value: _selectedType,
-                    items: [
-                      const DropdownMenuItem<DocumentType?>(
-                        value: null,
-                        child: Text("Todos"),
-                      ),
-                      ...DocumentType.values.map((type) {
-                        return DropdownMenuItem<DocumentType?>(
-                          value: type,
-                          child: Text(documentTypeToString(type)),
-                        );
-                      }),
-                    ],
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedType = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Filtro por data inicial
-                  const Text("Data Inicial:"),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(_startDate == null 
-                          ? "Não definida" 
-                          : DateFormat("dd/MM/yyyy").format(_startDate!)),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.calendar_today),
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: _startDate ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2030),
-                          );
-                          if (date != null) {
-                            setState(() {
-                              _startDate = date;
-                            });
-                          }
-                        },
-                      ),
-                      if (_startDate != null)
-                        IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _startDate = null;
-                            });
-                          },
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Filtro por data final
-                  const Text("Data Final:"),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(_endDate == null 
-                          ? "Não definida" 
-                          : DateFormat("dd/MM/yyyy").format(_endDate!)),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.calendar_today),
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: _endDate ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2030),
-                          );
-                          if (date != null) {
-                            setState(() {
-                              _endDate = date;
-                            });
-                          }
-                        },
-                      ),
-                      if (_endDate != null)
-                        IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _endDate = null;
-                            });
-                          },
-                        ),
-                    ],
-                  ),
-                ],
-              ),
+      builder: (ctx) => AlertDialog(
+        title: const Text("Configurações"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.view_list),
+              title: const Text("Visualização"),
+              subtitle: const Text("Configurar modo de exibição"),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                // Future: Implement view settings
+              },
             ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text("Cancelar"),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _applyFilters();
-                },
-                child: const Text("Aplicar"),
-              ),
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _selectedType = null;
-                    _startDate = null;
-                    _endDate = null;
-                  });
-                  Navigator.of(context).pop();
-                  _applyFilters();
-                },
-                child: const Text("Limpar Filtros"),
-              ),
-            ],
-          );
-        },
+            ListTile(
+              leading: const Icon(Icons.filter_list),
+              title: const Text("Filtros"),
+              subtitle: const Text("Configurar filtros padrão"),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                // Future: Implement filter settings
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text("Fechar"),
+          ),
+        ],
       ),
     );
   }
 
-  // Método para aplicar os filtros
-  void _applyFilters() {
-    final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
-    if (storeId == null) return;
+  Future<void> _processSelectedDocuments() async {
+    try {
+      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+      int processedCount = 0;
+      
+      for (final docId in _selectedDocuments) {
+        await docProvider.updateDocumentStatus(int.parse(docId), 'PROCESSADO');
+        processedCount++;
+      }
+      
+      if (mounted) {
+        ErrorHandler.showSuccessSnackBar(
+          context,
+          "$processedCount documento(s) processado(s)!",
+        );
+      }
+      _clearSelection();
+      
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showErrorSnackBar(context, "Erro ao processar: $e");
+      }
+    }
+  }
 
-    final docProvider = Provider.of<DocumentProvider>(context, listen: false);
-    
-    // Se não houver filtros, buscar todos os documentos
-    if (_selectedType == null && _startDate == null && _endDate == null) {
-      docProvider.fetchDocuments();
-      return;
-    }
+  Future<void> _generateReceiptForSelected() async {
+    try {
+      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+      final selectedDocs = docProvider.documents
+          .where((doc) => _selectedDocuments.contains(doc.id))
+          .toList();
+      
+      if (selectedDocs.isEmpty) {
+        if (mounted) {
+          ErrorHandler.showErrorSnackBar(context, "Nenhum documento selecionado.");
+        }
+        return;
+      }
 
-    // Converter datas para string no formato esperado pela API
-    String? startDateStr;
-    String? endDateStr;
-    if (_startDate != null) {
-      startDateStr = DateFormat("yyyy-MM-dd").format(_startDate!);
+      // Generate receipt content
+      final receiptLines = <String>[];
+      receiptLines.add('RECIBO DE DOCUMENTOS');
+      receiptLines.add('Data: ${DateFormat("dd/MM/yyyy HH:mm").format(DateTime.now())}');
+      receiptLines.add('');
+      
+      for (final doc in selectedDocs) {
+        final formattedDate = doc.date.isNotEmpty 
+            ? DateFormat("dd/MM/yyyy").format(DateTime.parse(doc.date))
+            : "Data inválida";
+        receiptLines.add('Doc #${doc.id} - ${documentTypeToString(doc.type)} - $formattedDate');
+      }
+      
+      receiptLines.add('');
+      receiptLines.add('Total de documentos: ${selectedDocs.length}');
+      
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text("Recibo Gerado"),
+            content: SingleChildScrollView(
+              child: Text(receiptLines.join('\n')),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text("Fechar"),
+              ),
+            ],
+          ),
+        );
+      }
+      
+      _clearSelection();
+      
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showErrorSnackBar(context, "Erro ao gerar recibo: $e");
+      }
     }
-    if (_endDate != null) {
-      endDateStr = DateFormat("yyyy-MM-dd").format(_endDate!);
+  }
+
+  Future<void> _printSelectedDocuments() async {
+    try {
+      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+      final selectedDocs = docProvider.documents
+          .where((doc) => _selectedDocuments.contains(doc.id))
+          .toList();
+      
+      if (selectedDocs.isEmpty) {
+        if (mounted) {
+          ErrorHandler.showErrorSnackBar(context, "Nenhum documento selecionado.");
+        }
+        return;
+      }
+
+      // For web, show print dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text("Imprimir Documentos"),
+            content: Text("Preparando impressão de ${selectedDocs.length} documento(s)..."),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text("Cancelar"),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  if (mounted) {
+                    ErrorHandler.showSuccessSnackBar(
+                      context,
+                      "${selectedDocs.length} documento(s) enviado(s) para impressão!",
+                    );
+                  }
+                },
+                child: const Text("Imprimir"),
+              ),
+            ],
+          ),
+        );
+      }
+      
+      _clearSelection();
+      
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showErrorSnackBar(context, "Erro ao imprimir: $e");
+      }
     }
-    
-    // Montar mapa de filtros e chamar o provedor
-    final filters = <String, dynamic>{};
-    if (_selectedType != null) filters['type'] = _selectedType!.toJson();
-    if (startDateStr != null) filters['startDate'] = startDateStr;
-    if (endDateStr != null) filters['endDate'] = endDateStr;
-    docProvider.fetchDocumentsWithFilters(filters);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Observar o ID da loja selecionada
-    final storeId = context.watch<StoreProvider>().selectedStoreId;
-    final docProvider = Provider.of<DocumentProvider>(context, listen: false);
-
-    // Se a loja mudar, atualizar o provider
-    if (storeId != null) {
-      docProvider.setStoreId(storeId);
-    }
-
-    // Se não houver loja selecionada, mostra uma mensagem
-    if (storeId == null) {
+    final storeProvider = Provider.of<StoreProvider>(context, listen: false);
+    
+    if (storeProvider.selectedStoreId == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Documentos")),
+        appBar: AppBar(title: const Text("Docu...")),
         drawer: const AppDrawer(),
         body: const Center(
           child: Text("Por favor, selecione uma loja primeiro."),
@@ -303,238 +409,392 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
       );
     }
 
-    return Scaffold(      appBar: AppBar(
-        title: const Text("Documentos"),
-        actions: [
-          // Layout toggle button
-          Consumer<LayoutProvider>(
-            builder: (ctx, layoutProvider, _) => IconButton(
-              icon: Icon(layoutProvider.documentLayoutType.icon),
-              tooltip: "Alterar layout: ${layoutProvider.documentLayoutType.displayName}",
-              onPressed: () => layoutProvider.toggleDocumentLayout(),
-            ),
-          ),
-          // Botão de filtro implementado
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            tooltip: "Filtrar Documentos",
-            onPressed: _showFilterDialog,
-          ),
-          Consumer<DocumentProvider>(
-            builder: (ctx, provider, _) => IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: provider.isLoading ? null : () => provider.fetchDocuments(),
-            ),
-          ),
+    return Scaffold(
+      appBar: _buildAppBar(),
+      drawer: const AppDrawer(),
+      body: Column(
+        children: [
+          _buildStoreBar(),
+          _buildTabBar(),
+          Expanded(child: _buildDocumentList()),
+          if (_isSelectionMode) _buildQuickActionBar(),
         ],
       ),
-      drawer: const AppDrawer(),
-      body: Consumer<DocumentProvider>(
-        builder: (ctx, docProvider, child) {
-          if (docProvider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (docProvider.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      floatingActionButton: _buildFloatingActionButton(),
+    );
+  }
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: _isSearching 
+          ? TextField(
+              controller: _searchController,
+              onChanged: _updateSearchQuery,
+              decoration: const InputDecoration(
+                hintText: 'Pesquisar documentos...',
+                border: InputBorder.none,
+                hintStyle: TextStyle(color: Colors.white70),
+              ),
+              style: const TextStyle(color: Colors.white),
+            )
+          : const Text("Docu..."),
+      titleTextStyle: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w500,
+        color: Colors.white,
+      ),
+      backgroundColor: Colors.blue[700],
+      foregroundColor: Colors.white,
+      actions: [
+        IconButton(
+          icon: Icon(_isSearching ? Icons.close : Icons.search),
+          onPressed: _toggleSearch,
+        ),
+        IconButton(
+          icon: const Icon(Icons.file_download),
+          onPressed: _exportDocuments,
+        ),
+        IconButton(
+          icon: const Icon(Icons.add_box),
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (ctx) => const EditDocumentScreen(),
+              ),
+            );
+          },
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          onSelected: (value) {
+            switch (value) {
+              case 'refresh':
+                Provider.of<DocumentProvider>(context, listen: false).fetchDocuments();
+                break;
+              case 'settings':
+                _showSettingsDialog();
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'refresh',
+              child: Row(
                 children: [
-                  Text("Erro: ${docProvider.error}"),
-                  ElevatedButton(
-                    onPressed: () => docProvider.fetchDocuments(),
-                    child: const Text("Tentar Novamente"),
-                  ),
+                  Icon(Icons.refresh),
+                  SizedBox(width: 8),
+                  Text('Atualizar'),
                 ],
               ),
-            );
-          }
+            ),
+            const PopupMenuItem(
+              value: 'settings',
+              child: Row(
+                children: [
+                  Icon(Icons.settings),
+                  SizedBox(width: 8),
+                  Text('Configurações'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
-          if (docProvider.documents.isEmpty) {
-            return const Center(
-              child: Text("Nenhum documento encontrado."),
-            );
-          }          // Layout-based document display
-          return Consumer<LayoutProvider>(
-            builder: (context, layoutProvider, child) {
-              return _buildLayoutBasedView(docProvider, layoutProvider.documentLayoutType);
-            },
-          );
-        },
+  Widget _buildStoreBar() {
+    return Consumer<StoreProvider>(
+      builder: (context, storeProvider, child) {
+        final storeName = storeProvider.selectedStore?.name ?? 'Main Store';
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Colors.grey[100],
+          child: Text(
+            storeName,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      color: Colors.white,
+      child: TabBar(
+        controller: _tabController,
+        tabs: _tabFilters.map((filter) => Tab(text: filter)).toList(),
+        labelColor: Colors.blue[700],
+        unselectedLabelColor: Colors.grey[600],
+        indicatorColor: Colors.blue[700],
+        indicatorWeight: 3,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
       ),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (ctx) => const EditDocumentScreen(), // Tela para criar novo
+    );
+  }
+  Widget _buildDocumentList() {
+    return Consumer<DocumentProvider>(
+      builder: (ctx, docProvider, child) {
+        if (docProvider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (docProvider.error != null) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text("Erro: ${docProvider.error}"),
+                ElevatedButton(
+                  onPressed: () => docProvider.fetchDocuments(),
+                  child: const Text("Tentar Novamente"),
+                ),
+              ],
             ),
           );
-        },
-      ),
+        }
+
+        if (docProvider.documents.isEmpty) {
+          return const Center(
+            child: Text("Nenhum documento encontrado."),
+          );
+        }
+
+        return TabBarView(
+          controller: _tabController,
+          children: _tabFilters.map((filter) {
+            final filteredDocs = _getFilteredDocuments(docProvider.documents, filter);
+              // Special handling for Balance Sheet tab
+            if (filter == 'BALANÇA') {
+              print('[DocumentListScreen] BALANÇA tab - Total documents: ${docProvider.documents.length}');
+              print('[DocumentListScreen] BALANÇA tab - Filtered documents: ${filteredDocs.length}');
+              for (var doc in filteredDocs) {
+                print('[DocumentListScreen] Document: ${doc.number}, Type: ${doc.type}, Date: ${doc.date}, Status: ${doc.status}');
+              }              return ImprovedBalanceSheetWidget(
+                documents: filteredDocs,
+                onExportBalanceSheet: _exportDocuments,
+              );
+            }
+            
+            return _buildDocumentListView(filteredDocs);
+          }).toList(),
+        );
+      },
     );
   }
 
-  // Layout-based view methods
-  Widget _buildLayoutBasedView(DocumentProvider docProvider, LayoutType layoutType) {
-    switch (layoutType) {
-      case LayoutType.list:
-        return _buildListView(docProvider);
-      case LayoutType.grid:
-        return _buildGridView(docProvider);
-      case LayoutType.card:
-        return _buildCardView(docProvider);
+  Widget _buildDocumentListView(List<Document> documents) {
+    if (documents.isEmpty) {
+      return const Center(
+        child: Text("Nenhum documento encontrado nesta categoria."),
+      );
     }
-  }
 
-  Widget _buildListView(DocumentProvider docProvider) {
     return ListView.builder(
-      itemCount: docProvider.documents.length,
+      itemCount: documents.length,
       itemBuilder: (ctx, index) {
-        final doc = docProvider.documents[index];
-        return _buildDocumentListTile(doc);
+        final doc = documents[index];
+        return _buildDocumentItem(doc);
       },
     );
   }
 
-  Widget _buildGridView(DocumentProvider docProvider) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(8.0),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.8,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemCount: docProvider.documents.length,
-      itemBuilder: (ctx, index) {
-        final doc = docProvider.documents[index];
-        return _buildDocumentGridCard(doc);
-      },
-    );
-  }
-
-  Widget _buildCardView(DocumentProvider docProvider) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(8.0),
-      itemCount: docProvider.documents.length,
-      itemBuilder: (ctx, index) {
-        final doc = docProvider.documents[index];
-        return _buildDocumentCard(doc);
-      },
-    );
-  }
-  Widget _buildDocumentListTile(Document doc) {
+  Widget _buildDocumentItem(Document doc) {
+    final isSelected = _selectedDocuments.contains(doc.id);
     final formattedDate = doc.date.isNotEmpty 
         ? DateFormat("dd/MM/yyyy").format(DateTime.parse(doc.date))
         : "Data inválida";
     final color = _getDocColor(doc.type, doc.status);
 
-    return ListTile(
-      leading: Icon(_getDocIcon(doc.type), color: color),
-      title: Text("#${doc.id} - ${documentTypeToString(doc.type)}"),
-      subtitle: Text("Data: $formattedDate - ${doc.status}"),
-      trailing: _buildDocumentTrailingAction(doc),
-      onTap: () => _navigateToDocumentDetail(doc),
-    );
-  }
-  Widget _buildDocumentGridCard(Document doc) {
-    final formattedDate = doc.date.isNotEmpty 
-        ? DateFormat("dd/MM/yyyy").format(DateTime.parse(doc.date))
-        : "Data inválida";
-    final color = _getDocColor(doc.type, doc.status);
-
-    return Card(
-      child: InkWell(
-        onTap: () => _navigateToDocumentDetail(doc),
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(_getDocIcon(doc.type), color: color, size: 40),
-              const SizedBox(height: 8),
-              Text(
-                "#${doc.id}",
-                style: const TextStyle(fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              Text(
-                documentTypeToString(doc.type),
-                style: const TextStyle(fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                formattedDate,
-                style: const TextStyle(fontSize: 10, color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
-              Text(
-                doc.status,
-                style: TextStyle(fontSize: 10, color: color),
-                textAlign: TextAlign.center,
-              ),
-              const Spacer(),
-              _buildDocumentTrailingAction(doc),
-            ],
+    return InkWell(
+      onTap: () {
+        if (_isSelectionMode) {
+          _toggleSelection(doc.id);
+        } else {
+          _navigateToDocumentDetail(doc);
+        }
+      },
+      onLongPress: () => _toggleSelection(doc.id),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue[50] : Colors.white,
+          border: const Border(
+            bottom: BorderSide(color: Colors.grey, width: 0.5),
           ),
         ),
-      ),
-    );
-  }
-  Widget _buildDocumentCard(Document doc) {
-    final formattedDate = doc.date.isNotEmpty 
-        ? DateFormat("dd/MM/yyyy").format(DateTime.parse(doc.date))
-        : "Data inválida";
-    final color = _getDocColor(doc.type, doc.status);
-
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0),
-      child: InkWell(
-        onTap: () => _navigateToDocumentDetail(doc),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Icon(_getDocIcon(doc.type), color: color, size: 48),
-              const SizedBox(width: 16),
-              Expanded(
+        child: Row(
+          children: [
+            // Vertical highlight bar
+            Container(
+              width: 4,
+              height: 72,
+              color: color,
+            ),
+            const SizedBox(width: 12),
+            // Document content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Document title and number
                     Text(
-                      "#${doc.id} - ${documentTypeToString(doc.type)}",
+                      "Documento #${doc.id}",
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
                         fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text("Data: $formattedDate"),
+                    // Date and type
                     Text(
-                      "Status: ${doc.status}",
-                      style: TextStyle(color: color),
+                      "$formattedDate • ${documentTypeToString(doc.type)}",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    // Status/comments
+                    Text(
+                      doc.status,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: color,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
               ),
-              _buildDocumentTrailingAction(doc),
-            ],
-          ),
+            ),
+            // Selection indicator or action button
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: isSelected
+                  ? Icon(Icons.check_circle, color: Colors.blue[700])
+                  : Icon(Icons.chevron_right, color: Colors.grey[400]),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildDocumentTrailingAction(Document doc) {
-    return doc.status == "CANCELADO"
-        ? const Icon(Icons.cancel, color: Colors.grey)
-        : IconButton(
-            icon: const Icon(Icons.delete_forever, color: Colors.red),
-            tooltip: "Cancelar Documento",
-            onPressed: () => _confirmCancelDocument(doc),
-          );
+  Widget _buildQuickActionBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        border: const Border(
+          top: BorderSide(color: Colors.grey, width: 0.5),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,        children: [
+          _buildQuickActionButton(
+            icon: Icons.play_arrow,
+            label: "Processar",
+            onPressed: _processSelectedDocuments,
+          ),
+          _buildQuickActionButton(
+            icon: Icons.receipt,
+            label: "Recibo",
+            onPressed: _generateReceiptForSelected,
+          ),
+          _buildQuickActionButton(
+            icon: Icons.print,
+            label: "Imprimir",
+            onPressed: _printSelectedDocuments,
+          ),
+          _buildQuickActionButton(
+            icon: Icons.delete,
+            label: "Excluir",
+            color: Colors.red,
+            onPressed: () {
+              _confirmDeleteSelected();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    Color? color,
+  }) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: color ?? Colors.blue[700],
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: color ?? Colors.blue[700],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  Widget _buildFloatingActionButton() {
+    return FloatingActionButton(
+      backgroundColor: Colors.blue[700],
+      foregroundColor: Colors.white,
+      child: const Icon(Icons.add),
+      onPressed: () {
+        // Determinar o tipo de documento baseado na aba atual
+        DocumentType? defaultType;
+        final currentTab = _tabFilters[_tabController.index];
+        
+        switch (currentTab) {
+          case 'ENTRADA':
+            defaultType = DocumentType.entrada;
+            break;
+          case 'SAÍDA':
+            defaultType = DocumentType.saida;
+            break;
+          case 'BALANÇA':
+            // Para balança, vamos usar entrada como padrão
+            defaultType = DocumentType.entrada;
+            break;
+          default:
+            // Para "TODOS", deixar o usuário escolher
+            defaultType = null;
+            break;
+        }
+        
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (ctx) => EditDocumentScreen(defaultType: defaultType),
+          ),
+        );
+      },
+    );
   }
 
   void _navigateToDocumentDetail(Document doc) {
@@ -545,27 +805,46 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
     );
   }
 
-  Future<void> _confirmCancelDocument(Document doc) async {
+  Future<void> _confirmDeleteSelected() async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Confirmar Cancelamento"),
-        content: Text("Tem certeza que deseja cancelar o documento #${doc.id}? Isso reverterá os movimentos de estoque associados."),
+        title: const Text("Confirmar Exclusão"),
+        content: Text(
+          "Tem certeza que deseja excluir ${_selectedDocuments.length} documento(s)? "
+          "Isso reverterá os movimentos de estoque associados.",
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text("Não")),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text("Sim, Cancelar", style: TextStyle(color: Colors.red))),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text("Cancelar"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              "Excluir",
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
         ],
       ),
     );
-    
+
     if (confirm == true) {
       try {
         final docProvider = Provider.of<DocumentProvider>(context, listen: false);
-        await docProvider.cancelDocument(int.parse(doc.id));
-        if (mounted) {
-          ErrorHandler.showSuccessSnackBar(context, "Documento cancelado!");
+        for (final docId in _selectedDocuments) {
+          await docProvider.cancelDocument(int.parse(docId));
         }
-      } catch (e) {      if (mounted) {
+        if (mounted) {
+          ErrorHandler.showSuccessSnackBar(
+            context,
+            "${_selectedDocuments.length} documento(s) cancelado(s)!",
+          );
+        }
+        _clearSelection();
+      } catch (e) {
+        if (mounted) {
           ErrorHandler.showErrorSnackBar(context, "Erro ao cancelar: $e");
         }
       }

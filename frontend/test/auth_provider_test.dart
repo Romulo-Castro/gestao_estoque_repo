@@ -1,4 +1,5 @@
 // Simple Flutter test to verify authentication after AuthProvider fix
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/services/api_service.dart';
 import 'package:frontend/providers/auth_provider.dart';
@@ -22,7 +23,7 @@ void main() {
         await authProvider.register('Test User', email, password);
       } catch (e) {
         // User might already exist, continue with login test
-        print('Registration failed (user might already exist): $e');
+        debugPrint('Registration failed (user might already exist): $e');
       }
       
       // Test login
@@ -33,9 +34,9 @@ void main() {
       expect(authProvider.token, isNotNull, reason: 'Token should be set after login');
       expect(authProvider.user, isNotNull, reason: 'User should be set after login');
       
-      print('✅ Login test passed!');
-      print('Token: ${authProvider.token}');
-      print('User: ${authProvider.user?.name} (${authProvider.user?.email})');
+      debugPrint('✅ Login test passed!');
+      debugPrint('Token: ${authProvider.token}');
+      debugPrint('User: ${authProvider.user?.name} (${authProvider.user?.email})');
     });
 
     test('Test login with incorrect credentials', () async {
@@ -46,7 +47,7 @@ void main() {
       expect(authProvider.token, isNull, reason: 'Token should be null after failed login');
       expect(authProvider.user, isNull, reason: 'User should be null after failed login');
       
-      print('✅ Invalid login test passed!');
+      debugPrint('✅ Invalid login test passed!');
     });
 
     test('Test token persistence', () async {      // Login first
@@ -63,13 +64,13 @@ void main() {
       final newAuthProvider = AuthProvider(apiService);
       
       // Wait a bit for the stored auth to load
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 100));
       
       expect(newAuthProvider.token, equals(originalToken), reason: 'Token should persist across app restarts');
       expect(newAuthProvider.user?.id, equals(originalUser?.id), reason: 'User should persist across app restarts');
       expect(newAuthProvider.isAuthenticated, true, reason: 'Authentication state should persist');
       
-      print('✅ Token persistence test passed!');
+      debugPrint('✅ Token persistence test passed!');
     });
   });
 }

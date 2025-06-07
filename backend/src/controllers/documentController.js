@@ -38,11 +38,9 @@ exports.getDocumentById = catchAsync(async (req, res, next) => {
 // POST /api/stores/:storeId/documents - Criar novo documento com itens
 exports.createDocument = catchAsync(async (req, res, next) => {
     const storeId = validateId(req.params.storeId, 'ID da loja');
-    const { type, document_date, customerId, supplierId, notes, items, total_amount } = req.body;
-
-    // Validações básicas - aceita tipos em inglês conforme o banco de dados
-    if (!["sale", "purchase", "adjustment_in", "adjustment_out"].includes(type)) {
-        throw new AppError('Tipo de documento inválido. Use: sale, purchase, adjustment_in ou adjustment_out', 400);
+    const { type, document_date, customerId, supplierId, notes, items, total_amount } = req.body;    // Validações básicas - aceita tipos em inglês conforme o banco de dados
+    if (!["sale", "purchase"].includes(type)) {
+        throw new AppError('Tipo de documento inválido. Use: sale ou purchase', 400);
     }
     
     if (!document_date) {
@@ -68,9 +66,7 @@ exports.createDocument = catchAsync(async (req, res, next) => {
             notes: notes?.trim() || null,
             totalAmount: total_amount || 0
         });
-        const documentId = docResult.lastID;
-
-        // 2. Criar os itens do documento e ajustar estoque
+        const documentId = docResult.lastID;        // 2. Criar os itens do documento e ajustar estoque
         for (const item of items) {
             // Aceita tanto itemId quanto item_id para compatibilidade
             const itemId = item.itemId || item.item_id;
@@ -79,19 +75,24 @@ exports.createDocument = catchAsync(async (req, res, next) => {
             if (!itemId || !itemQuantity || itemQuantity <= 0) {
                 throw new AppError('Item inválido no documento: ID e quantidade positiva são obrigatórios.', 400);
             }
-            // TODO: Validar se itemId existe na loja
+
+            // Validar se itemId existe na loja
+            const stockItem = await db.findStockItemByIdAndStore(itemId, storeId);
+            if (!stockItem) {
+                throw new AppError(`Item com ID ${itemId} não encontrado na loja.`, 400);
+            }            // Validar estoque para vendas
+            if (type === "sale" && stockItem.quantity < itemQuantity) {
+                throw new AppError(`Estoque insuficiente para o item "${stockItem.name}". Disponível: ${stockItem.quantity}, Solicitado: ${itemQuantity}`, 400);
+            }
 
             await db.createDocumentItem({
                 documentId,
-                itemId: item.itemId,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice || 0, // Preço pode ser opcional dependendo do tipo
-            });
-
-            // Ajustar estoque
-            const quantityChange = (type === "ENTRADA" || type === "AJUSTE_ENTRADA") ? item.quantity : -item.quantity;
-            await db.updateStockQuantity(item.itemId, storeId, quantityChange);
-            // TODO: Verificar se estoque ficou negativo se a regra de negócio exigir
+                itemId: itemId, // Use the extracted itemId
+                quantity: itemQuantity,
+                unitPrice: item.unitPrice || item.unit_price || 0, // Support both naming conventions
+            });            // Ajustar estoque - fix type checking to use English types
+            const quantityChange = (type === "purchase") ? itemQuantity : -itemQuantity;
+            await db.updateStockQuantity(itemId, storeId, quantityChange);
         }
 
         await db.commitTransaction();
@@ -162,14 +163,11 @@ exports.cancelDocument = catchAsync(async (req, res, next) => {
         }
 
         // 1. Buscar os itens do documento para saber o que reverter
-        const items = await db.findDocumentItemsByDocumentId(documentId);
-
-        // 2. Reverter os ajustes de estoque
+        const items = await db.findDocumentItemsByDocumentId(documentId);        // 2. Reverter os ajustes de estoque
         for (const item of items) {
             // A quantidade a reverter é o OPOSTO do ajuste original
-            const quantityToReverse = (document.type === "ENTRADA" || document.type === "AJUSTE_ENTRADA") ? -item.quantity : item.quantity;
+            const quantityToReverse = (document.type === "purchase") ? -item.quantity : item.quantity;
             await db.updateStockQuantity(item.item_id, storeId, quantityToReverse);
-            // TODO: Verificar se estoque ficou negativo se a regra de negócio exigir
         }
 
         // 3. Marcar o documento como cancelado (ou deletar, se preferir - menos seguro)
