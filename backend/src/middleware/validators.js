@@ -2,9 +2,14 @@
 const { body, validationResult, param, check } = require('express-validator'); // Adiciona 'check'
 
 // Middleware Handler
-const handleValidationErrors = (req, res, next) => { /* ... (código anterior) ... */
+// Uses `validationResult(req)` from express-validator to check accumulated
+// validation errors. If any are present, it returns an HTTP 400 response with
+// the error details; otherwise the request proceeds to the next middleware.
+const handleValidationErrors = (req, res, next) => {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) { return res.status(400).json({ errors: errors.array() }); }
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
     next();
 };
 
