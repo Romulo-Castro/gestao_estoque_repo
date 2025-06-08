@@ -63,15 +63,19 @@ exports.register = catchAsync(async (req, res, next) => {
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
 
     // 6. Responder com sucesso
-    sendSuccessResponse(res, {
-        message: 'Usuário registrado com sucesso!',
-        token: token,
-        user: {
-            id: newUser.id,
-            name: newUser.name,
-            email: newUser.email
-        }
-    }, 201);
+    sendSuccessResponse(
+        res,
+        {
+            token: token,
+            user: {
+                id: newUser.id,
+                name: newUser.name,
+                email: newUser.email,
+            },
+        },
+        'Usuário registrado com sucesso!',
+        201
+    );
 });
 
 // --- Função de Login ---
@@ -99,15 +103,18 @@ exports.login = catchAsync(async (req, res, next) => {
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
 
     // 4. Responder com sucesso e o token
-    sendSuccessResponse(res, {
-        message: 'Login bem-sucedido!',
-        token: token,
-        user: {
-            id: user.id,
-            name: user.name,
-            email: user.email
-        }
-    });
+    sendSuccessResponse(
+        res,
+        {
+            token: token,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+            },
+        },
+        'Login bem-sucedido!'
+    );
 });
 
 
