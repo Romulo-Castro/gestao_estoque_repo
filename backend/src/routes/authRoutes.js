@@ -28,4 +28,11 @@ router.post(
 // GET /api/auth/me
 router.get('/me', authenticateToken, authController.getMe);
 
+// Rotas de gerenciamento de perfil de usuário
+// PUT /api/auth/profile - Atualizar perfil do usuário (nome, email e opcionalmente senha)
+router.put('/profile', authenticateToken, authController.updateProfile);
+
+// PUT /api/auth/change-password - Alterar apenas a senha
+router.put('/change-password', authenticateToken, authController.changePassword);
+
 module.exports = router;

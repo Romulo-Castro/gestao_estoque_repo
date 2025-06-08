@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 // Importar Providers
 import 'core/presentation/providers/auth_provider.dart';
+import 'core/presentation/providers/user_profile_provider.dart';
 import 'core/presentation/providers/store_provider.dart';
 import 'core/presentation/providers/dashboard_provider.dart';
 import 'core/presentation/providers/layout_provider.dart';
@@ -12,6 +13,7 @@ import 'core/presentation/providers/customer_provider.dart';
 import 'core/presentation/providers/supplier_provider.dart';
 import 'core/presentation/providers/document_provider.dart';
 import 'core/presentation/providers/stock_provider.dart';
+import 'core/presentation/providers/theme_provider.dart';
 
 // Importar Telas
 import 'core/presentation/screens/login_screen.dart';
@@ -101,7 +103,17 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         // Provider para Autenticação
-        ChangeNotifierProvider(create: (_) => AuthProvider(apiService)),        ChangeNotifierProxyProvider<AuthProvider, StoreProvider>(
+        ChangeNotifierProvider(create: (_) => AuthProvider(apiService)),
+        
+        // User Profile Provider depends on Auth Provider
+        ChangeNotifierProxyProvider<AuthProvider, UserProfileProvider>(
+          create: (_) => UserProfileProvider(apiService, AuthProvider(apiService)),
+          update: (context, auth, previous) {
+            return UserProfileProvider(apiService, auth);
+          },
+        ),
+        
+        ChangeNotifierProxyProvider<AuthProvider, StoreProvider>(
           create: (_) => StoreProvider(),
           update: (context, auth, previous) {
             final provider = previous ?? StoreProvider();
@@ -118,6 +130,8 @@ class MyApp extends StatelessWidget {
           },        ),
         // Layout Provider - não precisa de ProxyProvider pois não depende de autenticação
         ChangeNotifierProvider(create: (_) => LayoutProvider()),
+        // Theme Provider - não precisa de ProxyProvider pois não depende de autenticação
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProxyProvider<AuthProvider, ItemGroupProvider>(
           create: (_) => ItemGroupProvider(),
           update: (context, auth, previous) {
@@ -158,84 +172,16 @@ class MyApp extends StatelessWidget {
           },
         ),
       ],
-      child: MaterialApp(
-        title: 'Gestão de Estoques PRO', // Nome que aparece no gerenciador de apps
-        // Definição do Tema Visual
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.indigo, // Cor base para gerar a paleta
-              // brightness: Brightness.light, // Opcional: Forçar tema claro
-              // primary: Colors.indigo[700], // Opcional: Ajustar cor primária
-          ),
-          useMaterial3: true, // Habilita o visual mais recente do Material Design
-          visualDensity: VisualDensity.adaptivePlatformDensity, // Ajusta espaçamento para a plataforma
-          // Tema para AppBar
-          appBarTheme: AppBarTheme(
-            elevation: 1.5, // Sombra um pouco mais pronunciada
-            centerTitle: true,
-            backgroundColor: Colors.indigo[600], // Um tom de índigo
-            foregroundColor: Colors.white, // Cor para título e ícones
-            titleTextStyle: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w500, // Semi-bold
-                color: Colors.white,
-                letterSpacing: 0.5), // Leve espaçamento
-          ),
-          // Tema para Campos de Texto
-          inputDecorationTheme: InputDecorationTheme(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8.0),
-              borderSide: BorderSide(color: Colors.grey[400]!), // Borda cinza claro
-            ),
-            enabledBorder: OutlineInputBorder( // Borda quando não focado
-              borderRadius: BorderRadius.circular(8.0),
-              borderSide: BorderSide(color: Colors.grey[400]!),
-            ),
-            focusedBorder: OutlineInputBorder( // Borda quando focado
-               borderRadius: BorderRadius.circular(8.0),
-               borderSide: const BorderSide(color: Colors.indigo, width: 1.5), // Usa cor primária
-            ),
-            filled: true,
-            fillColor: Colors.grey[100], // Fundo levemente acinzentado
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 12.0),
-            hintStyle: TextStyle(color: Colors.grey[500]) // Estilo para hintText
-          ),
-          // Tema para Botões Elevados
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: Colors.indigo, // Cor primária como fundo
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)), // Botões mais arredondados
-              textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-              elevation: 3.0, // Sombra do botão
-            ),
-          ),
-          // Tema para Floating Action Button
-          floatingActionButtonTheme: FloatingActionButtonThemeData(
-            backgroundColor: Colors.deepOrangeAccent[400], // Cor de destaque
-            foregroundColor: Colors.white,
-            elevation: 4.0,
-          ),
-          // Tema para ChoiceChip (usado em WelcomeScreen)
-          chipTheme: ChipThemeData(
-             selectedColor: Colors.indigo.withAlpha(40), // Cor de seleção com transparência
-             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-             labelStyle: TextStyle(color: Colors.grey[800]), // Cor do texto padrão
-             secondaryLabelStyle: const TextStyle(color: Colors.indigo) // Cor do texto quando selecionado
-          ),
-           // Tema para ListTile (usado em Drawers e listas)
-           listTileTheme: ListTileThemeData(
-             selectedTileColor: Colors.indigo.withAlpha(25), // Cor de fundo quando selecionado
-             iconColor: Colors.grey[600], // Cor padrão dos ícones
-           ),
-        ),
-        debugShowCheckedModeBanner: false, // Remove a faixa "Debug"
-        // Widget inicial da aplicação, controlado pelo AuthWrapper
-        initialRoute: '/',
-        // Definição das rotas nomeadas
-        routes: {
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'Gestão de Estoques PRO',
+            theme: themeProvider.lightTheme,
+            darkTheme: themeProvider.darkTheme,
+            themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            debugShowCheckedModeBanner: false,
+            initialRoute: '/',
+            routes: {
           '/': (context) => const AuthWrapper(),
           AppRoutes.login: (context) => const LoginScreen(),
           AppRoutes.register: (context) => const RegisterScreen(),
@@ -265,6 +211,8 @@ class MyApp extends StatelessWidget {
           AppRoutes.bulkImport: (context) => const BulkImportScreen(), // Rota para importação de mercadorias
           AppRoutes.expenses: (context) => const ExpensesScreen(), // Rota para despesas
           AppRoutes.help: (context) => const HelpScreen(), // Rota para ajuda
+        },
+      );
         },
       ),
     );

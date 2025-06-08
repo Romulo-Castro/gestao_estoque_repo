@@ -112,10 +112,9 @@ exports.login = catchAsync(async (req, res, next) => {
 
 
 // (Opcional) Função para obter dados do usuário logado
-exports.getMe = catchAsync(async (req, res, next) => {
-    // O middleware authenticateToken (se usado na rota) já colocou req.user
+exports.getMe = catchAsync(async (req, res, next) => {    // O middleware authenticateToken (se usado na rota) já colocou req.user
     if (!req.user || !req.user.userId) {
-        return unauthorized(res, 'Não autorizado ou token inválido');
+        throw unauthorized('Não autorizado ou token inválido');
     }
 
     const user = await db.findUserById(req.user.userId);
@@ -127,5 +126,112 @@ exports.getMe = catchAsync(async (req, res, next) => {
         id: user.id,
         name: user.name,
         email: user.email
+    });
+});
+
+// --- Função para atualizar perfil do usuário ---
+exports.updateProfile = catchAsync(async (req, res, next) => {
+    if (!req.user || !req.user.userId) {
+        throw unauthorized('Não autorizado ou token inválido');
+    }
+
+    const { name, email, currentPassword, newPassword } = req.body;
+
+    // Validate required fields
+    validateRequiredFields({ name, email }, ['name', 'email']);    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        throw new AppError('Formato de email inválido', 400);
+    }
+
+    // Get current user
+    const currentUser = await db.findUserByIdWithPassword(req.user.userId);
+    if (!currentUser) {
+        throw new AppError('Usuário não encontrado', 404);
+    }
+
+    // Check if email is being changed and if it's already in use
+    if (email !== currentUser.email) {
+        const existingUser = await db.findUserByEmail(email);
+        if (existingUser && existingUser.id !== req.user.userId) {
+            throw new AppError('Email já está em uso por outro usuário', 409);
+        }
+    }
+
+    // Prepare update data
+    const updateData = {
+        name: name.trim(),
+        email: email.trim(),
+    };
+
+    // Handle password change if provided
+    if (currentPassword && newPassword) {
+        // Validate current password
+        const isCurrentPasswordValid = await bcrypt.compare(currentPassword, currentUser.password_hash);
+        if (!isCurrentPasswordValid) {
+            throw new AppError('Senha atual incorreta', 400);
+        }
+
+        // Validate new password strength
+        if (newPassword.length < 6) {
+            throw new AppError('Nova senha deve ter pelo menos 6 caracteres', 400);
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        updateData.passwordHash = await bcrypt.hash(newPassword, salt);
+    }
+
+    // Update user in database
+    await db.updateUserProfile(req.user.userId, updateData);
+
+    // Get updated user data
+    const updatedUser = await db.findUserById(req.user.userId);
+
+    sendSuccessResponse(res, {
+        message: 'Perfil atualizado com sucesso!',
+        user: {
+            id: updatedUser.id,
+            name: updatedUser.name,
+            email: updatedUser.email
+        }
+    });
+});
+
+// --- Função para alterar senha ---
+exports.changePassword = catchAsync(async (req, res, next) => {
+    if (!req.user || !req.user.userId) {
+        throw unauthorized('Não autorizado ou token inválido');
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate required fields
+    validateRequiredFields({ currentPassword, newPassword }, ['currentPassword', 'newPassword']);
+
+    // Validate new password strength
+    if (newPassword.length < 6) {
+        throw new AppError('Nova senha deve ter pelo menos 6 caracteres', 400);
+    }    // Get current user
+    const currentUser = await db.findUserByIdWithPassword(req.user.userId);
+    if (!currentUser) {
+        throw new AppError('Usuário não encontrado', 404);
+    }
+
+    // Validate current password
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, currentUser.password_hash);
+    if (!isCurrentPasswordValid) {
+        throw new AppError('Senha atual incorreta', 400);
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const newPasswordHash = await bcrypt.hash(newPassword, salt);
+
+    // Update password in database
+    await db.updateUserPassword(req.user.userId, newPasswordHash);
+
+    sendSuccessResponse(res, {
+        message: 'Senha alterada com sucesso!'
     });
 });

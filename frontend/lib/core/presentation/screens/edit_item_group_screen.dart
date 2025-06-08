@@ -1,7 +1,7 @@
 // frontend/lib/screens/edit_item_group_screen.dart
 import "package:flutter/material.dart";
 import "package:provider/provider.dart";
-import "../../../models/item_group_model.dart";
+import "../../data/models/item_group_model.dart";
 import "../providers/item_group_provider.dart";
 import "../providers/store_provider.dart"; // Para obter o storeId
 import "../../../shared/utils/error_handler.dart";

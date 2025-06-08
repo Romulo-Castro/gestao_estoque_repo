@@ -37,9 +37,7 @@ class BalanceSheetData {
       periodStart: now,
       periodEnd: now,
     );
-  }
-
-  factory BalanceSheetData.fromDocuments(List<DocumentModel> documents) {
+  }  factory BalanceSheetData.fromDocuments(List<DocumentModel> documents) {
     final inflowItems = <BalanceSheetItem>[];
     final outflowItems = <BalanceSheetItem>[];
     
@@ -65,21 +63,16 @@ class BalanceSheetData {
       } catch (e) {
         // Skip documents with invalid dates
         continue;
-      }      // Calculate total value for this document
-      double documentTotal = 0.0;
-      for (final item in document.items) {
-        documentTotal += item.totalValue;
-      }final documentType = _stringToDocumentType(document.type);      final balanceItem = BalanceSheetItem(
+      }      // Use the document's total value directly (already correctly mapped from backend)
+      double documentTotal = document.totalValue;final documentType = _stringToDocumentType(document.type);      final balanceItem = BalanceSheetItem(
         documentId: document.id?.toString() ?? '',
         documentNumber: document.number,
         date: docDate,
         type: documentType,
         description: _getDocumentDescription(document),
         value: documentTotal,
-        itemCount: document.items.length,
-      );
-
-      // Classify as inflow or outflow
+        itemCount: 1, // Since we don't load individual items, use 1 for display
+      );      // Classify as inflow or outflow
       if (_isInflowDocument(documentType)) {
         inflowItems.add(balanceItem);
         totalInflows += documentTotal;
@@ -87,9 +80,7 @@ class BalanceSheetData {
         outflowItems.add(balanceItem);
         totalOutflows += documentTotal;
       }
-    }
-
-    // Sort items by date (most recent first)
+    }    // Sort items by date (most recent first)
     inflowItems.sort((a, b) => b.date.compareTo(a.date));
     outflowItems.sort((a, b) => b.date.compareTo(a.date));
 

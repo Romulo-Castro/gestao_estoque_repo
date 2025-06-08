@@ -104,12 +104,12 @@ class DocumentProvider with ChangeNotifier, ErrorHandlingMixin {
         document
       );
         // Atualizar na lista local
-      final index = _documents.indexWhere((d) => d.id == documentId.toString());
+      final index = _documents.indexWhere((d) => d.id?.toString() == documentId.toString());
       if (index != -1) {
         _documents[index] = updatedDocument;
       }
       
-      if (_currentDocument?.id == documentId.toString()) {
+      if (_currentDocument?.id?.toString() == documentId.toString()) {
         _currentDocument = updatedDocument;
       }
       
@@ -128,13 +128,13 @@ class DocumentProvider with ChangeNotifier, ErrorHandlingMixin {
       final updatedDocument = await _apiService.updateDocumentStatus(_storeId!, documentId, status);
       
       // Atualizar na lista local
-      final index = _documents.indexWhere((d) => d.id == documentId.toString());
+      final index = _documents.indexWhere((d) => d.id?.toString() == documentId.toString());
       
       if (index != -1) {
         _documents[index] = updatedDocument;
       }
       
-      if (_currentDocument?.id == documentId.toString()) {
+      if (_currentDocument?.id?.toString() == documentId.toString()) {
         _currentDocument = updatedDocument;
       }
       
@@ -154,12 +154,12 @@ class DocumentProvider with ChangeNotifier, ErrorHandlingMixin {
       final updatedDocument = await _apiService.updateDocument(_storeId!, documentId, document);
       
       // Atualizar na lista local
-      final index = _documents.indexWhere((d) => d.id == documentId.toString());
+      final index = _documents.indexWhere((d) => d.id?.toString() == documentId.toString());
       if (index != -1) {
         _documents[index] = updatedDocument;
       }
       
-      if (_currentDocument?.id == documentId.toString()) {
+      if (_currentDocument?.id?.toString() == documentId.toString()) {
         _currentDocument = updatedDocument;
       }
       
@@ -179,35 +179,13 @@ class DocumentProvider with ChangeNotifier, ErrorHandlingMixin {
       await _apiService.cancelDocument(_storeId!, documentId);
       
       // Atualizar na lista local
-      final index = _documents.indexWhere((d) => d.id == documentId.toString());
+      final index = _documents.indexWhere((d) => d.id?.toString() == documentId.toString());
       if (index != -1) {
-        final doc = _documents[index];
-        _documents[index] = DocumentModel(
-          id: doc.id,
-          number: doc.number,
-          type: doc.type,
-          description: doc.description,
-          totalValue: doc.totalValue,
-          date: doc.date,
-          status: 'CANCELADO',
-          storeId: doc.storeId,
-          items: doc.items,
-        );
+        _documents[index] = _documents[index].copyWith(status: 'CANCELADO');
       }
       
-      if (_currentDocument?.id == documentId.toString()) {
-        final doc = _currentDocument!;
-        _currentDocument = DocumentModel(
-          id: doc.id,
-          number: doc.number,
-          type: doc.type,
-          description: doc.description,
-          totalValue: doc.totalValue,
-          date: doc.date,
-          status: 'CANCELADO',
-          storeId: doc.storeId,
-          items: doc.items,
-        );
+      if (_currentDocument?.id?.toString() == documentId.toString()) {
+        _currentDocument = _currentDocument!.copyWith(status: 'CANCELADO');
       }
       
       debugPrint("[DocumentProvider] Documento $documentId cancelado");
@@ -237,9 +215,9 @@ class DocumentProvider with ChangeNotifier, ErrorHandlingMixin {
       await _apiService.deleteDocument(_storeId!, documentId);
       
       // Remover da lista local
-      _documents.removeWhere((d) => d.id == documentId.toString());
+      _documents.removeWhere((d) => d.id?.toString() == documentId.toString());
       
-      if (_currentDocument?.id == documentId.toString()) {
+      if (_currentDocument?.id?.toString() == documentId.toString()) {
         _currentDocument = null;
       }
       

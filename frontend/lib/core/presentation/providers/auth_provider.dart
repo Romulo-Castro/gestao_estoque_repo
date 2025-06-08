@@ -177,4 +177,12 @@ class AuthProvider with ChangeNotifier, ErrorHandlingMixin {
       debugPrint("AuthProvider: Nenhum token encontrado, usuário precisa fazer login");
     }
   }
+  
+  /// Update user profile information and persist changes
+  Future<void> updateUserProfile(User updatedUser) async {
+    _user = updatedUser;
+    await _saveAuthData();
+    notifyListeners();
+    debugPrint("AuthProvider: Perfil do usuário atualizado: ${_user?.name}");
+  }
 }

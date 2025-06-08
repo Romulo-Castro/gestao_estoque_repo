@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../data/models/document_model.dart';
 import '../../data/models/balance_sheet_model.dart';
-import '../../../models/document_model.dart';
+import '../../domain/entities/document_entity.dart';
 
 class BalanceSheetWidget extends StatefulWidget {
-  final List<Document> documents;
+  final List<DocumentModel> documents;
   final VoidCallback? onExportBalanceSheet;
 
   const BalanceSheetWidget({
@@ -31,42 +32,20 @@ class _BalanceSheetWidgetState extends State<BalanceSheetWidget> {
   @override
   void initState() {
     super.initState();
-    _updateBalanceData();
+    _calculateBalance();
   }
-
-  @override
-  void didUpdateWidget(BalanceSheetWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.documents != widget.documents) {
-      _updateBalanceData();
-    }
-  }  void _updateBalanceData() {
-    print('[BalanceSheetWidget] _updateBalanceData called');
-    print('[BalanceSheetWidget] Total documents received: ${widget.documents.length}');
-    
+  void _calculateBalance() {
     final filteredDocuments = widget.documents.where((doc) {
-      if (doc.date.isEmpty) {
-        print('[BalanceSheetWidget] Document ${doc.number} has empty date');
-        return false;
-      }
-      
+      if (doc.date.isEmpty) return false;
       try {
         final docDate = DateTime.parse(doc.date);
-        final contains = _selectedPeriod.contains(docDate);
-        print('[BalanceSheetWidget] Document ${doc.number}: date=${doc.date}, parsed=${docDate}, period contains: $contains');
-        return contains;
+        return _selectedPeriod.contains(docDate);
       } catch (e) {
-        print('[BalanceSheetWidget] Failed to parse date for document ${doc.number}: ${doc.date}, error: $e');
         return false;
       }
     }).toList();
 
-    print('[BalanceSheetWidget] Filtered documents count: ${filteredDocuments.length}');
-    
-    setState(() {
-      _balanceData = BalanceSheetData.fromDocuments(filteredDocuments);
-      print('[BalanceSheetWidget] Balance data calculated - Total Inflows: ${_balanceData.totalInflows}, Total Outflows: ${_balanceData.totalOutflows}, Net Balance: ${_balanceData.netBalance}');
-    });
+    _balanceData = BalanceSheetData.fromDocuments(filteredDocuments);
   }
 
   void _onPeriodChanged(BalanceSheetPeriod? period) {
@@ -74,7 +53,7 @@ class _BalanceSheetWidgetState extends State<BalanceSheetWidget> {
       setState(() {
         _selectedPeriod = period;
       });
-      _updateBalanceData();
+      _calculateBalance();
     }
   }
 
@@ -343,8 +322,7 @@ class _BalanceSheetWidgetState extends State<BalanceSheetWidget> {
         isThreeLine: true,
       ),
     );
-  }
-  IconData _getDocumentIcon(DocumentType type) {
+  }  IconData _getDocumentIcon(DocumentType type) {
     switch (type) {
       case DocumentType.entrada:
         return Icons.input;

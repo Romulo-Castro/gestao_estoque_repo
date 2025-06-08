@@ -37,24 +37,35 @@ const storage = multer.diskStorage({
     }
 });
 
-// Filtro de arquivo (opcional): Aceitar apenas imagens
+// Filtro de arquivo: Aceitar apenas imagens e alguns tipos específicos
 const fileFilter = (req, file, cb) => {
     // --- DEBUGGING ---
     console.log('--- Informações do Arquivo Recebido ---');
     console.log('Nome original:', file.originalname);
-    console.log('MIME Type recebido:', file.mimetype); // <-- O log mais importante!
+    console.log('MIME Type recebido:', file.mimetype);
     console.log('Encoding:', file.encoding);
     console.log('Tamanho:', file.size);
     console.log('---------------------------------------');
     // --- FIM DEBUGGING ---
 
-    if (file.mimetype && file.mimetype.startsWith('image/')) { // Adiciona verificação se mimetype existe
+    // Lista de tipos MIME aceitos (imagens)
+    const allowedMimeTypes = [
+        'image/jpeg',
+        'image/jpg', 
+        'image/png',
+        'image/gif',
+        'image/bmp',
+        'image/webp',
+        'image/svg+xml'
+    ];
+
+    if (file.mimetype && allowedMimeTypes.includes(file.mimetype.toLowerCase())) {
         console.log(`MIME Type "${file.mimetype}" aceito.`);
         cb(null, true); // Aceitar arquivo
     } else {
         console.log(`MIME Type "${file.mimetype}" REJEITADO.`);
         // Rejeitar arquivo, passando o erro específico
-        cb(new Error('Tipo de arquivo inválido. Apenas imagens são permitidas.'), false);
+        cb(new Error(`Tipo de arquivo inválido: ${file.mimetype}. Apenas imagens são permitidas (JPEG, PNG, GIF, BMP, WebP, SVG).`), false);
     }
 };
 
@@ -63,8 +74,41 @@ const upload = multer({
     storage: storage,
     fileFilter: fileFilter,
     limits: {
-        fileSize: 1024 * 1024 * 5 // Limite de 5MB (opcional)
+        fileSize: 1024 * 1024 * 10, // Limite de 10MB
+        files: 1 // Apenas um arquivo por vez
     }
 });
 
-module.exports = upload; // Exporta a instância configurada do multer
+// Middleware personalizado para capturar erros do multer
+const uploadWithErrorHandling = (req, res, next) => {
+    upload.single('productImage')(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            console.error('Erro do Multer:', err);
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(400).json({
+                    error: 'Arquivo muito grande. Tamanho máximo permitido: 10MB.',
+                    status: 'error'
+                });
+            } else if (err.code === 'LIMIT_FILE_COUNT') {
+                return res.status(400).json({
+                    error: 'Muitos arquivos. Envie apenas um arquivo por vez.',
+                    status: 'error'
+                });
+            } else {
+                return res.status(400).json({
+                    error: `Erro no upload: ${err.message}`,
+                    status: 'error'
+                });
+            }
+        } else if (err) {
+            console.error('Erro customizado:', err);
+            return res.status(400).json({
+                error: err.message,
+                status: 'error'
+            });
+        }
+        next();
+    });
+};
+
+module.exports = uploadWithErrorHandling; // Exporta o middleware com tratamento de erro

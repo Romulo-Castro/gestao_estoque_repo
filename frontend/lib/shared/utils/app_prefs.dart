@@ -105,7 +105,7 @@ class AppPrefs {
   /// Recupera as propriedades de item ativas
   static Future<List<String>> getItemProperties() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getStringList('item_properties') ?? [propName, propQuantity, propCategory];
+    return prefs.getStringList('item_properties') ?? [propName, propQuantity, propImage, propCategory];
   }
 
   /// Método genérico para salvar um valor booleano

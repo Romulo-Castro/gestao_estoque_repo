@@ -1,9 +1,13 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frontend/providers/auth_provider.dart';
-import 'package:frontend/services/api_service.dart';
+import 'package:frontend/core/presentation/providers/auth_provider.dart';
+import 'package:frontend/core/data/datasources/api_service.dart';
 
 void main() {
+  setUpAll(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+  });
+
   group('AuthProvider Fix Verification', () {
     test('Verify AuthProvider handles ApiService response correctly', () async {
       // This test verifies that AuthProvider can handle the response structure

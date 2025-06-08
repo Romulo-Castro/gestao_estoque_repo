@@ -52,19 +52,93 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
   List<String> _activeProperties = [];
   int _quantityDecimals = 0;
 
+  // Helper to get display names for properties
+  String _getPropertyDisplayName(String propKey) {
+    // This should ideally come from a centralized place or i18n
+    switch (propKey) {
+      case AppPrefs.propDescription:
+        return 'Descrição';
+      case AppPrefs.propBarcode:
+        return 'Código de Barras';
+      case AppPrefs.propUom:
+        return 'Unidade de Medida';
+      case AppPrefs.propCategory:
+        return 'Categoria';
+      // Add other known keys
+      default:
+        // Capitalize first letter for unknown keys
+        return propKey.isNotEmpty ? propKey[0].toUpperCase() + propKey.substring(1) : '';
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
-    _quantityController = TextEditingController();
-    _categoryController = TextEditingController();
-    _loadPreferencesAndSetupControllers();
+    _nameController = TextEditingController(text: widget.initialItem?.name ?? "");
+    _quantityController = TextEditingController(); 
+    _categoryController = TextEditingController(); 
+
+    _propControllers[AppPrefs.propDescription] = TextEditingController();
+    _propControllers[AppPrefs.propBarcode] = TextEditingController();
+    _propControllers[AppPrefs.propUom] = TextEditingController();
+    
     _currentImageUrl = widget.initialItem?.imageUrl;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ensureApiServiceToken();
-      // Carregar grupos de itens após o build inicial
-      _loadItemGroups();
+      _loadPreferencesAndSetupControllers().then((_) {
+        final groupProvider = Provider.of<ItemGroupProvider>(context, listen: false);
+        // setStoreId is a void method, so no await here.
+        // We assume that setStoreId will trigger a state change in ItemGroupProvider
+        // which will then be picked up by a Consumer/Selector or by calling
+        // _updateSelectedItemGroupFromProvider if needed after a short delay or via a listener.
+        groupProvider.setStoreId(widget.storeId);
+        // Call this after giving the provider a chance to update.
+        // If groups are loaded asynchronously by setStoreId, this might need a more robust solution
+        // like listening to ItemGroupProvider changes.
+        Future.microtask(() {
+          if (mounted) {
+            _updateSelectedItemGroupFromProvider();
+          }
+        });
+      });
     });
+  }
+
+  // Method to attempt setting the selected group
+  void _updateSelectedItemGroupFromProvider() {
+    final groupProvider = Provider.of<ItemGroupProvider>(context, listen: false);
+    if (_isEditing && widget.initialItem?.groupId != null && groupProvider.groups.isNotEmpty) {
+      try {
+        final foundGroup = groupProvider.groups.firstWhere(
+          (g) => g.id == widget.initialItem!.groupId,
+        );
+        // Check if it's actually a change to avoid unnecessary setState
+        if (_selectedItemGroup?.id != foundGroup.id) {
+          if (mounted) {
+            setState(() {
+              _selectedItemGroup = foundGroup;
+            });
+          }
+        }
+      } catch (e) {
+        // If it was previously set but now not found, or never found
+        if (mounted && _selectedItemGroup != null) { 
+           setState(() {
+             _selectedItemGroup = null;
+           });
+        }
+        debugPrint("[EditStockItemScreen] Initial group ID ${widget.initialItem!.groupId} not found in provider groups during _updateSelectedItemGroupFromProvider.");
+      }
+    } else if (_isEditing && widget.initialItem?.groupId != null && _selectedItemGroup != null && groupProvider.groups.isEmpty && !groupProvider.isLoading) {
+      // Groups became empty, and we had a selection, so clear it.
+      if (mounted) {
+        setState(() {
+          _selectedItemGroup = null;
+        });
+      }
+      debugPrint("[EditStockItemScreen] Groups are empty, clearing selected group.");
+    }
   }
 
   @override
@@ -80,71 +154,67 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
     _activeProperties = await AppPrefs.getItemProperties();
     _quantityDecimals = await AppPrefs.getQuantityDecimals();
 
-    _nameController.text = widget.initialItem?.name ?? "";
     final initialQuantity = widget.initialItem?.quantity ?? 0.0;
     _quantityController.text = initialQuantity.toStringAsFixed(_quantityDecimals);
 
-    // Manter categoria por compatibilidade, mas priorizar grupo
     if (_activeProperties.contains(AppPrefs.propCategory)) {
       _categoryController.text = widget.initialItem?.properties[AppPrefs.propCategory]?.toString() ?? "";
     }
+    
+    _propControllers[AppPrefs.propDescription]?.text = widget.initialItem?.properties[AppPrefs.propDescription]?.toString() ?? "";
+    _propControllers[AppPrefs.propBarcode]?.text = widget.initialItem?.properties[AppPrefs.propBarcode]?.toString() ?? "";
+    _propControllers[AppPrefs.propUom]?.text = widget.initialItem?.properties[AppPrefs.propUom]?.toString() ?? "";
 
-    // Configura controllers dinâmicos (exceto os dedicados e grupo)
-    _setupDynamicControllers();
+    _setupDynamicControllers(); 
 
-    // O grupo será carregado e selecionado em _loadItemGroups
-
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _loadItemGroups() async {
-    // Acessa o ItemGroupProvider (precisa estar disponível via Provider)
-    // Idealmente, injetado ou acessado de forma mais robusta.
-    // Assumindo que está disponível no contexto acima desta tela.
-    try {
-      final groupProvider = Provider.of<ItemGroupProvider>(context, listen: false);
-      // Garante que os grupos sejam buscados se ainda não o foram
-      if (groupProvider.groups.isEmpty && groupProvider.isLoading == false) {
-         await groupProvider.fetchItemGroups();
-      }
-      // Seleciona o grupo inicial se estiver editando
-      if (_isEditing && widget.initialItem?.groupId != null) {
-        // Corrigido: Não retornar null no orElse, mas sim encontrar o grupo ou deixar como null
-        try {
-          _selectedItemGroup = groupProvider.groups.firstWhere(
-            (g) => g.id == widget.initialItem!.groupId,
-          );
-        } catch (e) {
-          // Se não encontrar o grupo, deixa como null
-          _selectedItemGroup = null;
-          debugPrint("Grupo não encontrado: ${widget.initialItem!.groupId}");
-        }
-      }
-      if (mounted) setState(() {}); // Atualiza a UI com os grupos carregados
-    } catch (e) {
-      debugPrint("Erro ao carregar grupos de itens: $e");
-      if (mounted) _showErrorSnackbar("Erro ao carregar grupos de itens.");
-    }
+    if (mounted) setState(() {}); 
   }
 
   void _setupDynamicControllers() {
-    _propControllers.forEach((_, controller) => controller.dispose());
-    _propControllers.clear();
+    final Map<String, TextEditingController> newPropControllers = {};
+
+    final explicitlyHandledKeys = {
+      AppPrefs.propName, 
+      AppPrefs.propQuantity, 
+      AppPrefs.propImage, 
+      AppPrefs.propGroupId, 
+      AppPrefs.propCategory, 
+      AppPrefs.propDescription, 
+      AppPrefs.propBarcode, 
+      AppPrefs.propUom, 
+    };
 
     for (String propKey in _activeProperties) {
-      if (propKey != AppPrefs.propName &&
-          propKey != AppPrefs.propQuantity &&
-          propKey != AppPrefs.propImage &&
-          propKey != AppPrefs.propCategory && // Pula categoria
-          propKey != AppPrefs.propGroupId) // Pula groupId
-      {
-        String initialValue = "";
-        if (_isEditing && widget.initialItem?.properties.containsKey(propKey) == true) {
-          initialValue = widget.initialItem!.properties[propKey]?.toString() ?? "";
+      if (!explicitlyHandledKeys.contains(propKey)) {
+        String initialValue = widget.initialItem?.properties[propKey]?.toString() ?? "";
+        // Reuse existing controller if available, otherwise create new
+        newPropControllers[propKey] = _propControllers[propKey] ?? TextEditingController(text: initialValue);
+        // Ensure text is set if controller was reused but empty
+        if (newPropControllers[propKey]!.text.isEmpty && initialValue.isNotEmpty) {
+           newPropControllers[propKey]!.text = initialValue;
         }
-        _propControllers[propKey] = TextEditingController(text: initialValue);
       }
     }
+
+    // Dispose controllers that are no longer active or needed (excluding dedicated ones)
+    List<String> keysToDispose = [];
+    _propControllers.forEach((key, controller) {
+      if (!newPropControllers.containsKey(key) && 
+          key != AppPrefs.propDescription && 
+          key != AppPrefs.propBarcode && 
+          key != AppPrefs.propUom) {
+        keysToDispose.add(key);
+      }
+    });
+    for (var key in keysToDispose) {
+      _propControllers[key]?.dispose();
+      _propControllers.remove(key);
+    }
+    
+    // Add new controllers to _propControllers, preserving dedicated ones
+    newPropControllers.forEach((key, controller) {
+        _propControllers[key] = controller;
+    });
   }
 
   bool _ensureApiServiceToken() {
@@ -159,9 +229,18 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-      final XFile? pickedFile = await _picker.pickImage(source: source, imageQuality: 80, maxWidth: 1024);
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source, 
+        imageQuality: 80, 
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
       if (pickedFile != null && mounted) {
-        setState(() { _selectedImageFile = File(pickedFile.path); _currentImageUrl = null; });
+        setState(() { 
+          _selectedImageFile = File(pickedFile.path); 
+          _currentImageUrl = null; 
+        });
+        _showInfoSnackbar("Imagem selecionada com sucesso!");
       }
     } catch (e) {
       if (mounted) _showErrorSnackbar("Erro ao selecionar imagem: $e");
@@ -171,7 +250,11 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
   /// Permite selecionar qualquer arquivo (e não só imagem)
   Future<void> _pickAnyFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.any);
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'],
+        allowMultiple: false,
+      );
       if (result != null && result.files.isNotEmpty && mounted) {
         final path = result.files.single.path;
         if (path != null) {
@@ -179,6 +262,7 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
             _selectedImageFile = File(path);
             _currentImageUrl = null;
           });
+          _showInfoSnackbar("Arquivo selecionado: ${result.files.single.name}");
         }
       }
     } catch (e) {
@@ -193,34 +277,103 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
     }
     showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (BuildContext ctx) {
         return SafeArea(
-          child: Wrap(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Selecionar Imagem',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
               ListTile(
-                  leading: const Icon(Icons.photo_camera),
-                  title: const Text("Tirar Foto (Câmera)"),
-                  onTap: () { Navigator.of(ctx).pop(); _pickImage(ImageSource.camera); }),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text("Escolher da Galeria"),
-                onTap: () { Navigator.of(ctx).pop(); _pickImage(ImageSource.gallery); },
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.photo_camera, color: Colors.blue),
+                ),
+                title: const Text("Câmera"),
+                subtitle: const Text("Tirar uma foto"),
+                onTap: () { 
+                  Navigator.of(ctx).pop(); 
+                  _pickImage(ImageSource.camera); 
+                },
               ),
               ListTile(
-                leading: const Icon(Icons.attach_file),
-                title: const Text("Escolher Arquivo"),
-                onTap: () { Navigator.of(ctx).pop(); _pickAnyFile(); },
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.photo_library, color: Colors.green),
+                ),
+                title: const Text("Galeria"),
+                subtitle: const Text("Escolher da galeria de fotos"),
+                onTap: () { 
+                  Navigator.of(ctx).pop(); 
+                  _pickImage(ImageSource.gallery); 
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.attach_file, color: Colors.orange),
+                ),
+                title: const Text("Arquivo"),
+                subtitle: const Text("Escolher qualquer arquivo"),
+                onTap: () { 
+                  Navigator.of(ctx).pop(); 
+                  _pickAnyFile(); 
+                },
               ),
               if (_selectedImageFile != null || (_currentImageUrl != null && _currentImageUrl!.isNotEmpty))
                 ListTile(
-                  leading: const Icon(Icons.delete_outline, color: Colors.red),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.delete_outline, color: Colors.red),
+                  ),
                   title: const Text("Remover Imagem", style: TextStyle(color: Colors.red)),
+                  subtitle: const Text("Excluir imagem atual"),
                   onTap: () {
-                    if (mounted) setState(() { _selectedImageFile = null; _currentImageUrl = null; });
-                    Navigator.of(ctx).pop();
-                    _showInfoSnackbar("Imagem removida localmente. Salve para confirmar.");
+                    if (mounted) {
+                      setState(() { 
+                        _selectedImageFile = null; 
+                        _currentImageUrl = null; 
+                      });
+                      Navigator.of(ctx).pop();
+                      _showInfoSnackbar("Imagem removida. Salve para confirmar.");
+                    }
                   },
                 ),
+              const SizedBox(height: 16),
             ],
           ),
         );
@@ -245,70 +398,123 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
     final double quantity = double.tryParse(normalizedQuantity) ?? 0.0;
 
     final Map<String, dynamic> properties = {};
-    // Categoria (mantida por compatibilidade, mas grupo é preferível)
+
     if (_activeProperties.contains(AppPrefs.propCategory)) {
       final categoryValue = _categoryController.text.trim();
       properties[AppPrefs.propCategory] = categoryValue.isNotEmpty ? categoryValue : null;
     }
-    // Outras propriedades dinâmicas
+
+    final dedicatedPropKeys = [AppPrefs.propDescription, AppPrefs.propBarcode, AppPrefs.propUom];
+    for (var key in dedicatedPropKeys) {
+      if (_activeProperties.contains(key) && _propControllers.containsKey(key)) {
+        final value = _propControllers[key]!.text.trim();
+        properties[key] = value.isNotEmpty ? value : null;
+      } else if (_activeProperties.contains(key)) {
+         properties[key] = null; 
+      }
+    }
+    
     _propControllers.forEach((key, controller) {
-      if (_activeProperties.contains(key)) {
+      if (_activeProperties.contains(key) && 
+          !dedicatedPropKeys.contains(key) && 
+          key != AppPrefs.propCategory) {
         final value = controller.text.trim();
-        properties[key] = value.isNotEmpty ? value : null; // Simplificado, ajustar tipos se necessário
+        properties[key] = value.isNotEmpty ? value : null;
       }
     });
 
     try {
       StockItem itemToSave;
-      StockItem? savedItem;
+      StockItem? savedItemResult; 
 
-      // Usar o ID do grupo selecionado
       final int? groupId = _selectedItemGroup?.id;
 
       if (_isEditing) {
         itemToSave = widget.initialItem!.copyWith(
           name: _nameController.text.trim(),
           quantity: quantity,
-          groupId: groupId,
+          groupId: groupId, 
           properties: properties,
         );
-        savedItem = await _apiService.updateStockItem(widget.storeId, itemToSave.id, itemToSave);
+        // ApiService methods are non-nullable, so result will not be null unless an exception occurs
+        savedItemResult = await _apiService.updateStockItem(widget.storeId, itemToSave.id, itemToSave);
       } else {
         itemToSave = StockItem(
-          id: 0,
+          id: 0, 
           storeId: widget.storeId,
           name: _nameController.text.trim(),
           quantity: quantity,
-          groupId: groupId,
+          groupId: groupId, 
           properties: properties,
-          createdAt: "",
-          updatedAt: "",
+          createdAt: DateTime.now().toIso8601String(), 
+          updatedAt: DateTime.now().toIso8601String(),
         );
-        savedItem = await _apiService.createStockItem(widget.storeId, itemToSave);
+        // ApiService methods are non-nullable
+        savedItemResult = await _apiService.createStockItem(widget.storeId, itemToSave);
+      }
+      
+      StockItem currentSavedItem = savedItemResult; 
+
+      bool imageOperationAttempted = false;
+      String? finalImageUrl = currentSavedItem.imageUrl; 
+
+      if (_selectedImageFile != null) {
+        imageOperationAttempted = true;
+        if (mounted) ErrorHandler.showLoadingSnackBar(context, "Enviando imagem...");
+        try {
+          // ApiService.uploadImage is non-nullable
+          final StockItem itemWithImage = await _apiService.uploadImage(widget.storeId, currentSavedItem.id, _selectedImageFile!);
+          if (mounted) ScaffoldMessenger.of(context).removeCurrentSnackBar();
+          finalImageUrl = itemWithImage.imageUrl; 
+          currentSavedItem = itemWithImage; 
+          if (mounted) {
+            _showInfoSnackbar("Imagem enviada com sucesso!");
+            setState(() {
+              _currentImageUrl = finalImageUrl;
+              _selectedImageFile = null;
+            });
+          }
+        } catch (uploadError) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).removeCurrentSnackBar();
+            _showErrorSnackbar("Erro ao enviar imagem: ${ErrorHandler.handleError(uploadError)}. O item foi salvo sem a nova imagem.");
+          }
+        }
+      } else if (_isEditing && _currentImageUrl == null && (widget.initialItem?.imageUrl != null && widget.initialItem!.imageUrl!.isNotEmpty)) {
+        imageOperationAttempted = true;
+        if (mounted) ErrorHandler.showLoadingSnackBar(context, "Removendo imagem do servidor...");
+        try {
+          await _apiService.deleteItemImage(widget.storeId, currentSavedItem.id);
+          finalImageUrl = null; 
+          if (mounted) {
+            ScaffoldMessenger.of(context).removeCurrentSnackBar();
+            _showInfoSnackbar("Imagem removida no servidor.");
+            setState(() {
+              _currentImageUrl = null; 
+            });
+          }
+        } catch (imgError) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).removeCurrentSnackBar();
+            _showErrorSnackbar("Erro ao remover imagem no servidor: ${ErrorHandler.handleError(imgError)}");
+          }
+        }
       }
 
-      // Upload da imagem (se selecionada)
-      if (_selectedImageFile != null) {
-        final itemWithImage = await _apiService.uploadImage(widget.storeId, savedItem.id, _selectedImageFile!);
-        savedItem = itemWithImage;
-      }
-      // Remoção de imagem (se desmarcada)
-      else if (_isEditing && _currentImageUrl == null && _selectedImageFile == null && widget.initialItem?.imageUrl != null) {
-         // Implementação da chamada API para remover imagem do item
-         try {
-           await _apiService.deleteItemImage(widget.storeId, savedItem.id);
-           _showInfoSnackbar("Imagem removida no servidor.");
-         } catch (imgError) {
-           _showErrorSnackbar("Erro ao remover imagem no servidor: $imgError");
-           // Continuar mesmo se a remoção da imagem falhar?
-         }
-      }
+      final StockItem resultItemToReturn = currentSavedItem.copyWith(imageUrl: finalImageUrl);
 
       if (mounted) {
-        Navigator.pop(context, true); // Sinaliza sucesso
+        if (imageOperationAttempted) {
+            await Future.delayed(Duration(milliseconds: (_selectedImageFile == null && finalImageUrl == null) ? 500 : 1500));
+        }
+        Navigator.pop(context, resultItemToReturn); 
       }
+
     } catch (e) {
-      if (mounted) { _showErrorSnackbar("Erro ao salvar item: $e"); }
+      if (mounted) { 
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        _showErrorSnackbar("Erro ao salvar item: ${ErrorHandler.handleError(e)}"); 
+      }
     } finally {
       if (mounted) { setState(() => _isLoading = false); }
     }
@@ -390,21 +596,84 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
     if (_selectedImageFile != null) {
       return FileImage(_selectedImageFile!);
     } else if (_currentImageUrl != null && _currentImageUrl!.isNotEmpty) {
-      // Adicionar token se necessário para imagens privadas
       final token = Provider.of<AuthProvider>(context, listen: false).token;
       Map<String, String>? headers;
       if (token != null) {
         headers = {"Authorization": "Bearer $token"};
       }
-      return NetworkImage(_currentImageUrl!, headers: headers);
+      // Add a cache-busting query parameter to force reload if URL is the same but content changed
+      return NetworkImage("$_currentImageUrl?v=${DateTime.now().millisecondsSinceEpoch}", headers: headers);
     }
     return null;
   }
 
+  Widget _buildImageActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: _isLoading ? null : onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 20, color: Colors.grey[700]),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey[700],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Acessa o provider de grupos para o dropdown
     final itemGroupProvider = context.watch<ItemGroupProvider>();
+
+    // Schedule state updates for after the build completes to avoid navigator lock
+    if (_isEditing && widget.initialItem?.groupId != null && itemGroupProvider.groups.isNotEmpty) {
+      bool needsUpdate = _selectedItemGroup == null || _selectedItemGroup!.id != widget.initialItem!.groupId;
+      if (needsUpdate) {
+          final groupExists = itemGroupProvider.groups.any((g) => g.id == widget.initialItem!.groupId);
+          if (groupExists) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _updateSelectedItemGroupFromProvider();
+              }
+            });
+          } else { // Group does not exist in provider
+             if (_selectedItemGroup != null) {
+               WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && _selectedItemGroup != null && !itemGroupProvider.groups.any((g) => g.id == widget.initialItem!.groupId)) {
+                      setState(() {
+                          _selectedItemGroup = null;
+                      });
+                  }
+              });
+             }
+          }
+      }
+    } else if (_isEditing && widget.initialItem?.groupId != null && _selectedItemGroup != null && itemGroupProvider.groups.isEmpty && !itemGroupProvider.isLoading) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _selectedItemGroup != null && itemGroupProvider.groups.isEmpty && !itemGroupProvider.isLoading) {
+                setState(() {
+                    _selectedItemGroup = null;
+                });
+            }
+        });
+    }
 
     if (_activeProperties.isEmpty && !_isLoading) {
       return Scaffold(
@@ -412,223 +681,351 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
           body: const Center(child: CircularProgressIndicator()));
     }
 
+    // Start of UI refactoring based on user prompt
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (_isLoading) return; // Prevent pop if loading
+            // Use a safe navigation method that doesn't interfere with build cycles
+            if (Navigator.canPop(context)) {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
         title: Text(_isEditing ? "Editar Item" : "Adicionar Item"),
         actions: [
-          if (_isEditing)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              color: Colors.red[700],
-              tooltip: "Excluir Item",
-              onPressed: _isLoading ? null : _deleteItem,
-            ),
           IconButton(
-            icon: const Icon(Icons.save_outlined),
-            tooltip: "Salvar Item",
+            icon: const Icon(Icons.label_outline), // Etiqueta (categorias)
+            tooltip: 'Categorias/Grupos',
+            onPressed: () {
+              // TODO: Implementar navegação ou diálogo para categorias/grupos
+              _showInfoSnackbar('Funcionalidade de grupos/categorias a ser implementada.');
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.check),
+            tooltip: "Salvar",
             onPressed: _isLoading ? null : _saveItem,
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'delete') {
+                _deleteItem();
+              }
+              // Adicionar mais opções se necessário
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              if (_isEditing)
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Text('Excluir Item', style: TextStyle(color: Colors.red)),
+                ),
+              // Outras opções podem ser adicionadas aqui
+            ],
           ),
         ],
       ),
-      body: Stack(
+      body: Stack( // Stack for loading overlay
         children: [
-          GestureDetector(
-            onTap: () => FocusScope.of(context).unfocus(),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    // --- Seção da Imagem ---
-                    if (_activeProperties.contains(AppPrefs.propImage)) ...[
-                      Center(
-                        child: GestureDetector(
-                          onTap: _isLoading ? null : () => _showImageSourceActionSheet(context),
-                          child: Stack(
-                            children: [
-                              CircleAvatar(
-                                radius: 60,
-                                backgroundColor: Colors.grey[200],
-                                backgroundImage: _getImageProvider(),
-                                onBackgroundImageError: (_selectedImageFile == null && _currentImageUrl != null && _currentImageUrl!.isNotEmpty)
-                                    ? (exception, stackTrace) {
-                                        debugPrint("Erro ao carregar imagem de rede (Edit): $_currentImageUrl -> $exception");
-                                        // Limpar URL se houver erro
-                                        if (mounted) {
-                                          setState(() {
-                                            _currentImageUrl = null;
-                                          });
-                                        }
-                                      }
-                                    : null,
-                                child: (_selectedImageFile == null && (_currentImageUrl == null || _currentImageUrl!.isEmpty))
-                                    ? const Icon(Icons.add_a_photo, size: 40, color: Colors.grey)
-                                    : null,
-                              ),
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).primaryColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.add_a_photo, color: Colors.white, size: 20),
-                                ),
-                              ),
-                            ],
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  // Seletor de Loja (Placeholder - funcionalidade a ser definida)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    alignment: Alignment.center,
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: "all_stores", // Placeholder value
+                        isDense: true,
+                        items: const [
+                          DropdownMenuItem(
+                            value: "all_stores",
+                            child: const Text("– Todas as Lojas –"), // Added const
                           ),
+                          // TODO: Popular com lojas reais se necessário
+                        ],
+                        onChanged: (value) {
+                          // TODO: Implementar lógica de seleção de loja
+                          _showInfoSnackbar('Seleção de loja a ser implementada.');
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Campo Nome do Item
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration( // Added const
+                      labelText: 'Nome do Item',
+                      border: OutlineInputBorder(),
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (value) => (value?.trim().isEmpty ?? true) ? 'Nome é obrigatório' : null,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Campo Código de Barras
+                  TextFormField(
+                    controller: _propControllers[AppPrefs.propBarcode],
+                    decoration: InputDecoration(
+                      labelText: 'Código de Barras',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min, // Importante para Row dentro de suffixIcon
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            tooltip: 'Editar manualmente',
+                            onPressed: () {
+                              // Permitir edição direta já é o comportamento padrão
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.qr_code_scanner),
+                            tooltip: 'Escanear código',
+                            onPressed: _scanBarcode,
+                          ),
+                        ],
+                      ),
+                    ),
+                    keyboardType: TextInputType.text,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Campo Descrição
+                  TextFormField(
+                    controller: _propControllers[AppPrefs.propDescription],
+                    decoration: const InputDecoration( // Added const
+                      labelText: 'Descrição',
+                      border: OutlineInputBorder(),
+                    ),
+                    textCapitalization: TextCapitalization.sentences,
+                    maxLines: 3, // Permitir até 3-4 linhas
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Campo Quantidade
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Text('Quantidade:', style: TextStyle(fontSize: 16)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _quantityController,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none, // Para um visual mais limpo
+                            contentPadding: EdgeInsets.symmetric(vertical: 0)
+                          ),
+                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                          ],
+                          validator: (value) {
+                            if (value?.trim().isEmpty ?? true) return 'Quantidade é obrigatória';
+                            final normalizedValue = value!.trim().replaceAll(',', '.');
+                            final parsedValue = double.tryParse(normalizedValue);
+                            if (parsedValue == null) return 'Quantidade inválida';
+                            if (parsedValue < 0) return 'Quantidade não pode ser negativa';
+                            return null;
+                          },
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Center(
-                        child: TextButton.icon(
-                          icon: const Icon(Icons.camera_alt),
-                          label: const Text("Adicionar Imagem"),
-                          onPressed: _isLoading ? null : () => _showImageSourceActionSheet(context),
-                        ),
+                      FloatingActionButton.small(
+                        heroTag: 'increment_quantity',
+                        onPressed: () {
+                          double currentValue = double.tryParse(_quantityController.text.replaceAll(',', '.')) ?? 0.0;
+                          setState(() {
+                            _quantityController.text = (currentValue + 1).toStringAsFixed(_quantityDecimals);
+                          });
+                        },
+                        child: const Icon(Icons.add),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(width: 8),
+                      FloatingActionButton.small(
+                        heroTag: 'decrement_quantity',
+                        onPressed: () {
+                          double currentValue = double.tryParse(_quantityController.text.replaceAll(',', '.')) ?? 0.0;
+                          if (currentValue > 0) {
+                            setState(() {
+                              _quantityController.text = (currentValue - 1).toStringAsFixed(_quantityDecimals);
+                            });
+                          }
+                        },
+                        child: const Icon(Icons.remove),
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  const Divider(),
+                  const Center(child: Icon(Icons.keyboard_arrow_down)),
+                  const SizedBox(height: 16),
 
-                    // --- Campo de Nome ---
-                    TextFormField(
-                      controller: _nameController,
-                      decoration: const InputDecoration(
-                        labelText: "Nome do Item *",
-                        hintText: "Ex: Arroz Tipo 1",
-                        prefixIcon: Icon(Icons.inventory_2_outlined),
-                      ),
-                      textCapitalization: TextCapitalization.sentences,
-                      enabled: !_isLoading,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return "Nome é obrigatório";
-                        }
-                        return null;
-                      },
+                  // Área de Imagens (Placeholder 1)
+                  Container(
+                    height: 150,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey, style: BorderStyle.solid, width: 1), // Alterado para sólido
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const SizedBox(height: 16),
-
-                    // --- Campo de Quantidade ---
-                    TextFormField(
-                      controller: _quantityController,
-                      decoration: const InputDecoration(
-                        labelText: "Quantidade *",
-                        hintText: "Ex: 10.5",
-                        prefixIcon: Icon(Icons.numbers_outlined),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*[,.]?\d*$')),
-                      ],
-                      enabled: !_isLoading,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return "Quantidade é obrigatória";
-                        }
-                        final normalizedValue = value.replaceAll(",", ".");
-                        if (double.tryParse(normalizedValue) == null) {
-                          return "Quantidade inválida";
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // --- Dropdown de Grupo de Item ---
-                    DropdownButtonFormField<ItemGroup?>(
-                      decoration: const InputDecoration(
-                        labelText: "Grupo",
-                        hintText: "Selecione um grupo",
-                        prefixIcon: Icon(Icons.category_outlined),
-                      ),
-                      value: _selectedItemGroup,
-                      items: [
-                        const DropdownMenuItem<ItemGroup?>(
-                          value: null,
-                          child: Text("Sem grupo"),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.photo_library),
+                          label: const Text('Adicionar da Galeria'),
+                          onPressed: () => _pickImage(ImageSource.gallery),
                         ),
-                        ...itemGroupProvider.groups.map((group) {
-                          return DropdownMenuItem<ItemGroup?>(
-                            value: group,
-                            child: Text(group.name),
-                          );
-                        }),
-                      ],
-                      onChanged: _isLoading ? null : (ItemGroup? newValue) {
-                        setState(() {
-                          _selectedItemGroup = newValue;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // --- Campo de Categoria (mantido por compatibilidade) ---
-                    if (_activeProperties.contains(AppPrefs.propCategory))
-                      TextFormField(
-                        controller: _categoryController,
-                        decoration: const InputDecoration(
-                          labelText: "Categoria (opcional)",
-                          hintText: "Ex: Alimentos",
-                          prefixIcon: Icon(Icons.category_outlined),
+                        const SizedBox(height: 10),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.camera_alt),
+                          label: const Text('Capturar com Câmera'),
+                          onPressed: () => _pickImage(ImageSource.camera),
                         ),
-                        textCapitalization: TextCapitalization.sentences,
-                        enabled: !_isLoading,
-                      ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
-                    // --- Campos Dinâmicos ---
-                    ..._propControllers.entries.map((entry) {
-                      final propKey = entry.key;
-                      final controller = entry.value;
-                      // Campo de leitura de código de barras
-                      if (propKey == AppPrefs.propBarcode) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 16.0),
-                          child: TextFormField(
-                            controller: controller,
-                            decoration: InputDecoration(
-                              labelText: "$propKey (opcional)",
-                              prefixIcon: const Icon(Icons.qr_code),
-                              suffixIcon: IconButton(
-                                icon: const Icon(Icons.camera_alt),
-                                onPressed: _isLoading ? null : _scanBarcode,
+                  // Área de Miniaturas (Placeholder 2)
+                  // Esta área será dinâmica baseada em _selectedImageFile e _currentImageUrl
+                  _buildImagePreviewSection(),
+                  const SizedBox(height: 16),
+
+
+                  // --- Seleção de Grupo ---
+                  if (_activeProperties.contains(AppPrefs.propGroupId) || true) // Sempre mostrar por enquanto
+                    Card(
+                      elevation: 1,
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: DropdownButtonFormField<ItemGroup>(
+                          value: _selectedItemGroup,
+                          decoration: const InputDecoration(
+                            labelText: 'Grupo do Item',
+                            border: InputBorder.none,
+                            prefixIcon: Icon(Icons.category_outlined, color: Colors.orange),
+                          ),
+                          items: [
+                            const DropdownMenuItem<ItemGroup>(
+                              value: null,
+                              child: Text('Sem grupo'),
+                            ),
+                            ...itemGroupProvider.groups.map((group) =>
+                              DropdownMenuItem<ItemGroup>(
+                                value: group,
+                                child: Text(group.name),
                               ),
                             ),
-                            enabled: !_isLoading,
-                          ),
-                        );
-                      }
-                      // Campos dinâmicos padrão
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 16.0),
-                        child: TextFormField(
-                          controller: controller,
-                          decoration: InputDecoration(
-                            labelText: "$propKey (opcional)",
-                            prefixIcon: const Icon(Icons.label_outline),
-                          ),
-                          enabled: !_isLoading,
+                          ],
+                          onChanged: (ItemGroup? newGroup) {
+                            if (mounted) {
+                              setState(() {
+                                _selectedItemGroup = newGroup;
+                              });
+                            }
+                          },
+                          isExpanded: true,
                         ),
-                      );
-                    }),
+                      ),
+                    ),
+                  
+                  // --- Categoria (Texto Livre) ---
+                  TextFormField(
+                    controller: _categoryController,
+                    decoration: const InputDecoration(
+                      labelText: 'Categoria (texto livre)',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.bookmark_border_outlined),
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 16),
 
-                    const SizedBox(height: 32),
-                  ],
-                ),
+                  const SizedBox(height: 70), // Espaço para o botão flutuante não cobrir
+                ],
               ),
             ),
           ),
           if (_isLoading)
             Container(
-              color: const Color.fromRGBO(0, 0, 0, 0.3),
+              color: Colors.black.withOpacity(0.3),
               child: const Center(child: CircularProgressIndicator()),
             ),
         ],
       ),
+      // FloatingActionButton removido para seguir o novo design (botão check na AppBar)
+    );
+  }
+
+  Widget _buildImagePreviewSection() {
+    final imageProvider = _getImageProvider();
+    return Container(
+      height: 120, // Altura para miniaturas
+      padding: const EdgeInsets.all(8.0),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.blueGrey, style: BorderStyle.solid, width: 1),
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.grey[100],
+      ),
+      child: imageProvider != null
+          ? Stack(
+              alignment: Alignment.center,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4.0),
+                  child: Image(
+                    image: imageProvider,
+                    fit: BoxFit.contain,
+                    height: 100,
+                    width: 100,
+                    errorBuilder: (context, error, stackTrace) => 
+                      const Center(child: Icon(Icons.broken_image, color: Colors.grey, size: 40)),
+                  ),
+                ),
+                Positioned(
+                  top: -10,
+                  right: -10,
+                  child: IconButton(
+                    icon: const Icon(Icons.remove_circle, color: Colors.redAccent),
+                    tooltip: 'Remover Imagem',
+                    onPressed: _isLoading ? null : () {
+                      if (mounted) {
+                        setState(() {
+                          _selectedImageFile = null;
+                          _currentImageUrl = null;
+                        });
+                        _showInfoSnackbar("Imagem removida. Salve para confirmar a remoção no servidor.");
+                      }
+                    },
+                  ),
+                ),
+              ],
+            )
+          : Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.image_search, size: 40, color: Colors.grey[400]),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Nenhuma imagem selecionada',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }

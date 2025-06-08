@@ -4,6 +4,7 @@ import '../../domain/entities/document_entity.dart';
 import '../../domain/entities/balance_sheet_entity.dart';
 import '../../domain/usecases/documents/get_documents.dart';
 import '../../domain/usecases/documents/get_balance_sheet.dart';
+import '../../../shared/utils/logger.dart';
 
 class CleanDocumentProvider extends ChangeNotifier {
   final GetDocumentsUseCase _getDocumentsUseCase;
@@ -55,24 +56,23 @@ class CleanDocumentProvider extends ChangeNotifier {
       return;
     }
 
-    print('[CleanDocumentProvider] Loading documents for store: $_storeId');
+    AppLogger.info('Loading documents for store: $_storeId', 'CleanDocumentProvider');
     _setLoading(true);
     _clearError();
 
     try {
       final documents = await _getDocumentsUseCase(_storeId!);
       _documents = documents;
-      print('[CleanDocumentProvider] Loaded ${documents.length} documents');
+      AppLogger.info('Loaded ${documents.length} documents', 'CleanDocumentProvider');
       
       // Log detailed document information for debugging
-      for (final doc in documents) {
-        print('[CleanDocumentProvider] Document: ${doc.number}, type: ${doc.type}, '
-              'date: ${doc.date}, value: ${doc.totalValue}, status: ${doc.status}');
+      for (final doc in documents) {        AppLogger.debug('Document: ${doc.number}, type: ${doc.type}, '
+              'date: ${doc.date}, value: ${doc.totalValue}, status: ${doc.status}', 'CleanDocumentProvider');
       }
       
       notifyListeners();
     } catch (e) {
-      print('[CleanDocumentProvider] Error loading documents: $e');
+      AppLogger.error('Error loading documents: $e', 'CleanDocumentProvider');
       _setError('Failed to load documents: $e');
     } finally {
       _setLoading(false);
@@ -85,7 +85,7 @@ class CleanDocumentProvider extends ChangeNotifier {
       return;
     }
 
-    print('[CleanDocumentProvider] Calculating balance sheet for period: ${period.label}');
+    AppLogger.info('Calculating balance sheet for period: ${period.label}', 'CleanDocumentProvider');
     _setLoading(true);
     _clearError();
 
@@ -95,15 +95,14 @@ class CleanDocumentProvider extends ChangeNotifier {
         period: period,
       );
       
-      _balanceSheet = balanceSheet;
-      print('[CleanDocumentProvider] Balance sheet calculated - '
+      _balanceSheet = balanceSheet;      AppLogger.info('Balance sheet calculated - '
             'Inflows: ${balanceSheet.totalInflows}, '
             'Outflows: ${balanceSheet.totalOutflows}, '
-            'Net: ${balanceSheet.netBalance}');
+            'Net: ${balanceSheet.netBalance}', 'CleanDocumentProvider');
       
       notifyListeners();
     } catch (e) {
-      print('[CleanDocumentProvider] Error calculating balance sheet: $e');
+      AppLogger.error('Error calculating balance sheet: $e', 'CleanDocumentProvider');
       _setError('Failed to calculate balance sheet: $e');
     } finally {
       _setLoading(false);
@@ -114,16 +113,16 @@ class CleanDocumentProvider extends ChangeNotifier {
     List<DocumentEntity> documents,
     BalanceSheetPeriodEntity period,
   ) {
-    print('[CleanDocumentProvider] Calculating balance sheet from ${documents.length} documents');
+    AppLogger.debug('Calculating balance sheet from ${documents.length} documents', 'CleanDocumentProvider');
     
     final filteredDocuments = documents.where((doc) {
       final isInPeriod = period.contains(doc.date);
       final isActive = !doc.isCancelled;
-      print('[CleanDocumentProvider] Document ${doc.number}: period=$isInPeriod, active=$isActive');
+      AppLogger.debug('Document ${doc.number}: period=$isInPeriod, active=$isActive', 'CleanDocumentProvider');
       return isInPeriod && isActive;
     }).toList();
 
-    print('[CleanDocumentProvider] Filtered to ${filteredDocuments.length} documents');
+    AppLogger.debug('Filtered to ${filteredDocuments.length} documents', 'CleanDocumentProvider');
     
     final balanceSheet = BalanceSheetEntity.fromDocuments(filteredDocuments);
     _balanceSheet = balanceSheet;

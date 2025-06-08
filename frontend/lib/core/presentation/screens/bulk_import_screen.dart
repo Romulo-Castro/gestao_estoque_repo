@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../data/models/import_result.dart';
-// import '../../../shared/services/bulk_import_service.dart'; // TODO: Create this service
+import '../../../shared/services/bulk_import_service.dart';
 import '../providers/store_provider.dart';
 import '../../../shared/utils/error_handler.dart';
 

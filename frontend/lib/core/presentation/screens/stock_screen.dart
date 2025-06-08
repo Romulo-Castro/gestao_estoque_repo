@@ -6,7 +6,7 @@ import '../../data/models/store_model.dart';
 import '../providers/store_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/layout_provider.dart';
-import '../../../shared/services/api_service.dart';
+import '../../data/datasources/api_service.dart';
 import '../screens/edit_stock_item_screen.dart';
 import '../screens/bulk_import_screen.dart';
 import '../../../shared/utils/app_prefs.dart';
@@ -162,7 +162,6 @@ class _StockScreenState extends State<StockScreen> {
          debugPrint("[StockScreen] Erro ao carregar itens: $e");
       }
     }
-    // Finally não é estritamente necessário se try/catch cobrir todos os setState
   }
 
   // Garante que o ApiService tem o token atual do AuthProvider

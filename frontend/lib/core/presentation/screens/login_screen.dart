@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../../../shared/utils/app_routes.dart';
+import '../../../main.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -32,16 +32,19 @@ class _LoginScreenState extends State<LoginScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
     // Mostrar indicador de loading
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Realizando login...'), duration: Duration(seconds: 2)),
-      );
-    }
+    // Check mounted before showing SnackBar
+    if (!mounted) return; 
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Realizando login...'), duration: Duration(seconds: 2)),
+    );
 
     final success = await authProvider.login(
       _emailController.text.trim(),
       _passwordController.text,
     );
+
+    // Check mounted again after async operation
+    if (!mounted) return;
 
     if (success) {
       authProvider.clearError();

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frontend/models/supplier_model.dart';
+import 'package:frontend/core/data/models/supplier_model.dart';
 
 void main() {
   group('Supplier Model Tests', () {

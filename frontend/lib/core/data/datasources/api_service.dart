@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io'; // Para File, se usar upload de imagem
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart'; // Para MediaType
 // Importe seus modelos aqui se precisar retornar tipos específicos
 import '../models/document_model.dart';
 import '../models/stock_item.dart';
@@ -151,6 +152,46 @@ class ApiService {
     }
   }
 
+  // User profile management
+  Future<Map<String, dynamic>> updateUserProfile(Map<String, dynamic> updateData) async {
+    final url = Uri.parse('$baseUrl/auth/profile');
+    try {
+      final response = await http.put(
+        url,
+        headers: _headers,
+        body: json.encode(updateData),
+      ).timeout(const Duration(seconds: 15));
+      return await _handleResponse(response);
+    } on SocketException {
+      throw Exception('Erro de conexão. Verifique sua internet e se o servidor está acessível.');
+    } on http.ClientException catch (e) {
+      throw Exception('Erro ao comunicar com o servidor: ${e.message}');
+    }
+  }
+
+  Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final url = Uri.parse('$baseUrl/auth/change-password');
+    final body = json.encode({
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    });
+    try {
+      final response = await http.put(
+        url,
+        headers: _headers,
+        body: body,
+      ).timeout(const Duration(seconds: 15));
+      return await _handleResponse(response);
+    } on SocketException {
+      throw Exception('Erro de conexão. Verifique sua internet e se o servidor está acessível.');
+    } on http.ClientException catch (e) {
+      throw Exception('Erro ao comunicar com o servidor: ${e.message}');
+    }
+  }
+
   // Stores endpoints
   Future<List<Store>> fetchUserStores() async {
     final url = Uri.parse('$baseUrl/stores');
@@ -294,14 +335,60 @@ class ApiService {
     await _handleResponse(response);
   }
   Future<StockItem> uploadImage(int storeId, int itemId, File file) async {
-    final url = Uri.parse('$baseUrl/stores/$storeId/stock/$itemId/image');
-    final request = http.MultipartRequest('POST', url);
-    request.headers.addAll(_headers);
-    request.files.add(await http.MultipartFile.fromPath('productImage', file.path));
-    final streamed = await request.send().timeout(const Duration(seconds: 30));
-    final response = await http.Response.fromStream(streamed);
-    final data = await _handleResponse(response) as Map<String, dynamic>;
-    return StockItem.fromJson(data);
+    try {
+      final url = Uri.parse('$baseUrl/stores/$storeId/stock/$itemId/image');
+      final request = http.MultipartRequest('POST', url);
+      request.headers.addAll(_headers);
+      
+      // Validação local do arquivo
+      final fileSizeInMB = file.lengthSync() / (1024 * 1024);
+      if (fileSizeInMB > 10) {
+        throw Exception('Arquivo muito grande. Tamanho máximo: 10MB. Tamanho atual: ${fileSizeInMB.toStringAsFixed(1)}MB');
+      }
+      
+      // Determinar o tipo MIME correto baseado na extensão do arquivo
+      String contentType = 'application/octet-stream'; // fallback
+      final extension = file.path.toLowerCase().split('.').last;
+      switch (extension) {
+        case 'jpg':
+        case 'jpeg':
+          contentType = 'image/jpeg';
+          break;
+        case 'png':
+          contentType = 'image/png';
+          break;
+        case 'gif':
+          contentType = 'image/gif';
+          break;
+        case 'bmp':
+          contentType = 'image/bmp';
+          break;
+        case 'webp':
+          contentType = 'image/webp';
+          break;
+        case 'svg':
+          contentType = 'image/svg+xml';
+          break;
+      }
+      
+      // Adicionar o arquivo com o tipo MIME correto
+      request.files.add(await http.MultipartFile.fromPath(
+        'productImage', 
+        file.path,
+        contentType: MediaType.parse(contentType),
+      ));
+      
+      final streamed = await request.send().timeout(const Duration(seconds: 60));
+      final response = await http.Response.fromStream(streamed);
+      
+      final data = await _handleResponse(response) as Map<String, dynamic>;
+      return StockItem.fromJson(data);
+    } catch (e) {
+      if (e.toString().contains('TimeoutException')) {
+        throw Exception('Timeout no upload da imagem. Verifique sua conexão e tente novamente.');
+      }
+      rethrow;
+    }
   }
   
   Future<StockItem> deleteItemImage(int storeId, int itemId) async {

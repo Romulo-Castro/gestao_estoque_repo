@@ -8,6 +8,16 @@ const cors = require('cors');
 const path = require('path');
 const dbSetup = require('./data/database'); // Importa o setup do DB SQLite
 
+// Importar middleware de segurança
+const {
+    generalLimiter,
+    authLimiter,
+    uploadLimiter,
+    helmetConfig,
+    securityLogger,
+    detectSuspiciousActivity
+} = require('./middleware/securityMiddleware');
+
 // Importar arquivos de ROTA PRINCIPAL (outras rotas serão montadas dentro delas)
 const authRoutes = require('./routes/authRoutes'); // Assumindo que você criará este
 const storeRoutes = require('./routes/storeRoutes'); // Assumindo que você criará este (e ele montará stockRoutes)
@@ -25,30 +35,47 @@ async function startServer() {
         await dbSetup.connectDb();
         console.log("Iniciando criação/verificação de tabelas...");
         await dbSetup.createTables();
-        console.log("Configuração do banco de dados concluída.");
+        console.log("Configuração do banco de dados concluída.");        // === Middleware de Segurança ===
+        // Helmet para headers de segurança
+        app.use(helmetConfig);
+        
+        // Morgan para logging HTTP
+        app.use(securityLogger);
+        
+        // Rate limiting geral
+        app.use(generalLimiter);
+        
+        // Detecção de atividade suspeita
+        app.use(detectSuspiciousActivity);
 
         // === Middleware Essencial ===
         app.use(cors()); // Habilitar CORS
-        app.use(express.json()); // Parsear JSON
-        app.use(express.urlencoded({ extended: true })); // Parsear URL-encoded (menos comum, mas pode ser útil)
+        app.use(express.json({ limit: '10mb' })); // Parsear JSON com limite
+        app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Parsear URL-encoded com limite
 
         // Servir arquivos estáticos da pasta de uploads
         const uploadsAbsolutePath = path.join(__dirname, '../', UPLOAD_DIR);
         console.log(`Configurando rota estática para /${UPLOAD_DIR} em ${uploadsAbsolutePath}`);
         // IMPORTANTE: A URL base será relativa à raiz do servidor. Ex: http://localhost:3000/uploads/arquivo.jpg
-        app.use(`/${UPLOAD_DIR}`, express.static(uploadsAbsolutePath));
-
-
-        // === Rotas da API ===
+        app.use(`/${UPLOAD_DIR}`, express.static(uploadsAbsolutePath));        // === Rotas da API ===
         console.log("Configurando rotas da API...");
+        
+        // Health check endpoint (sem rate limiting)
+        app.get('/health', (req, res) => {
+            res.status(200).json({
+                status: 'ok',
+                timestamp: new Date().toISOString(),
+                uptime: process.uptime(),
+                environment: process.env.NODE_ENV || 'production'
+            });
+        });
+        
         // Rota raiz da API para teste
         app.get('/api', (req, res) => {
             res.send('API Gestão de Estoques (SQLite) está funcionando!');
-        });
-
-        // Montar rotas de Autenticação
+        });// Montar rotas de Autenticação com rate limiting específico
         // Exemplo: /api/auth/login, /api/auth/register
-        app.use('/api/auth', authRoutes);
+        app.use('/api/auth', authLimiter, authRoutes);
 
         // Montar rotas de Lojas (que incluirão as rotas de estoque aninhadas)
         // Exemplo: GET /api/stores, POST /api/stores, GET /api/stores/:storeId,

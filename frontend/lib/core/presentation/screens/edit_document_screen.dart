@@ -1,8 +1,8 @@
 // frontend/lib/core/presentation/screens/edit_document_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../data/models/document_model.dart' as doc_model;
 import '../../domain/entities/document_entity.dart';
+import '../../data/models/document_model.dart';
 import '../../data/models/customer_model.dart';
 import '../../data/models/supplier_model.dart';
 import '../../data/models/stock_item.dart';
@@ -40,18 +40,42 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
   Supplier? _selectedSupplier;
   StockItem? _selectedStockItem;
 
-  final List<doc_model.DocumentItemModel> _items = [];
+  final List<DocumentItemModel> _items = [];
   bool _isLoading = false;
   final bool _isSaving = false;
 
   // New variables for adjustment mode
   bool _isAdjustmentMode = false;
-  doc_model.DocumentModel? _baseDocument;
+  DocumentModel? _baseDocument;
 
   final _quantityController = TextEditingController(text: "1");
   final _priceController = TextEditingController(text: "0.00");
 
   final _addItemFormKey = GlobalKey<FormState>();
+
+  // Helper function to convert string to DocumentType
+  DocumentType _parseDocumentType(String type) {
+    switch (type.toLowerCase()) {
+      case 'entrada':
+        return DocumentType.entrada;
+      case 'saida':
+        return DocumentType.saida;
+      default:
+        return DocumentType.unknown;
+    }
+  }
+
+  // Helper function to convert DocumentType to string
+  String _documentTypeToString(DocumentType type) {
+    switch (type) {
+      case DocumentType.entrada:
+        return 'entrada';
+      case DocumentType.saida:
+        return 'saida';
+      case DocumentType.unknown:
+        return 'unknown';
+    }
+  }
 
   @override
   void initState() {
@@ -77,7 +101,7 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
     final arguments = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     if (arguments != null) {
       final mode = arguments['mode'] as String?;
-      final baseDocument = arguments['baseDocument'] as doc_model.DocumentModel?;
+      final baseDocument = arguments['baseDocument'] as DocumentModel?;
       
       if (mode == 'adjustment' && baseDocument != null) {
         _isAdjustmentMode = true;
@@ -92,15 +116,9 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
     
     setState(() {
       // Set the document type to be the same as the base
-      _selectedType = _baseDocument!.type;
+      _selectedType = _parseDocumentType(_baseDocument!.type);
       
-      // Set the customer or supplier
-      if (_baseDocument!.customerId != null) {
-        // Will be set when customers are loaded
-      }
-      if (_baseDocument!.supplierId != null) {
-        // Will be set when suppliers are loaded
-      }
+      // Set the customer or supplier - will be handled when data loads
       
       // Copy items from base document
       _items.clear();
@@ -167,9 +185,8 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
         setState(() {
           _numberController.text = document.number;
           _dateController.text = document.date;
-          _referenceController.text = document.reference ?? '';
-          _notesController.text = document.notes ?? '';
-          _selectedType = document.type;
+          // Note: DocumentModel doesn't have reference and notes fields
+          _selectedType = _parseDocumentType(document.type);
           _items.clear();
           _items.addAll(document.items);
         });
@@ -280,13 +297,19 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                   final quantity = double.parse(_quantityController.text);
                   final price = double.parse(_priceController.text);
                   
+                  // Validation: Ensure the selected stock item has a valid ID
+                  if (_selectedStockItem == null || _selectedStockItem!.id <= 0) {
+                    ErrorHandler.showErrorSnackBar(context, 'Erro: Item selecionado inválido. Tente selecionar novamente.');
+                    return;
+                  }
+                  
                   setState(() {
-                    _items.add(doc_model.DocumentItemModel(
-                      id: _selectedStockItem!.id,
+                    _items.add(DocumentItemModel(
+                      id: null, // Changed from _selectedStockItem!.id
                       quantity: quantity.toInt(),
                       unitValue: price,
                       totalValue: quantity * price,
-                      description: _selectedStockItem!.name ?? '',
+                      description: _selectedStockItem!.name,
                       stockItemId: _selectedStockItem!.id,
                     ));
                     _selectedStockItem = null;
@@ -311,48 +334,101 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
     });
   }
 
-  void _updateItem(int index, doc_model.DocumentItemModel item) {
+  void _updateItem(int index, DocumentItemModel item) {
     setState(() {
       _items[index] = item;
     });
   }
 
   Future<void> _saveDocument() async {
+    if (_formKey.currentState?.validate() == false) {
+      ErrorHandler.showErrorSnackBar(context, 'Por favor, corrija os erros no formulário.');
+      return;
+    }
     if (!mounted) return;
 
     setState(() => _isLoading = true);
 
     try {
-      final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
-      if (storeId == null) {
-        throw Exception('Nenhuma loja selecionada');
+      final storeProvider = Provider.of<StoreProvider>(context, listen: false);
+      if (storeProvider.selectedStoreId == null) {
+        throw Exception('Nenhuma loja selecionada para salvar o rascunho.');
       }
 
-      final document = doc_model.Document(
-        id: _documentId ?? DateTime.now().millisecondsSinceEpoch.toString(),
-        number: _numberController.text,
-        type: _selectedType,
-        date: _dateController.text,
-        reference: _referenceController.text,
-        notes: _notesController.text,
+      double totalValue = _items.fold(0.0, (sum, item) => sum + item.totalValue);
+      String documentDate = DateTime.now().toIso8601String().split('T')[0];
+      // Attempt to parse date from controller if available and valid
+      if (_dateController.text.isNotEmpty) {
+        try {
+          // Assuming _dateController.text is in "dd/MM/yyyy" format as used in _presentDatePicker logic
+          // This part needs a robust date parsing, ideally aligning with how _selectedDate is set.
+          // For simplicity, if _selectedDate is already set, use it. Otherwise, parse or default.
+          final parts = _dateController.text.split('/');
+          if (parts.length == 3) {
+            final day = int.tryParse(parts[0]);
+            final month = int.tryParse(parts[1]);
+            final year = int.tryParse(parts[2]);
+            if (day != null && month != null && year != null) {
+              documentDate = DateTime(year, month, day).toIso8601String().split('T')[0];
+            }
+          }
+        } catch (e) {
+          // Ignore parsing error, use current date
+          debugPrint("Error parsing date from _dateController for draft: $e");
+        }
+      }
+
+
+      final document = DocumentModel(
+        id: _documentId != null ? int.tryParse(_documentId!) : null,
+        number: _numberController.text.isEmpty
+            ? 'DRAFT-${DateTime.now().millisecondsSinceEpoch}'
+            : _numberController.text,
+        type: _documentTypeToString(_selectedType),
+        description: _notesController.text.isNotEmpty ? _notesController.text : "Rascunho de Documento",
+        totalValue: totalValue,
+        date: documentDate,
+        status: 'DRAFT', // Save as DRAFT
+        storeId: storeProvider.selectedStoreId!,
         items: _items,
-        customerId: _selectedCustomer?.id.toString(),
-        supplierId: _selectedSupplier?.id.toString(),
-        sourceWarehouseId: _selectedSourceWarehouseId?.toString(),
-        destinationWarehouseId: _selectedDestinationWarehouseId?.toString(),
-        status: 'DRAFT',
-        createdAt: DateTime.now().toIso8601String(),
-        updatedAt: DateTime.now().toIso8601String(),
-      );      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
-      final result = _documentId == null
-          ? await docProvider.createDocument(document)
-          : await docProvider.updateDocument(int.parse(_documentId!), document);      if (!mounted) return;      if (result != null) {
-        ErrorHandler.showSuccessSnackBar(context, 'Documento salvo com sucesso!');
-        Navigator.of(context).pop();      } else {
-        ErrorHandler.showErrorSnackBar(context, 'Erro ao salvar documento: ${docProvider.error}');
-      }    } catch (e) {
+        // Optional: include _selectedCustomer?.id or _selectedSupplier?.id if your backend handles them for drafts
+      );
+
+      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+      
+      // If _documentId exists and we are saving a draft, it's an update to that draft.
+      // Otherwise, it's a new draft.
+      final bool isUpdatingExistingDraft = _documentId != null;
+      
+      DocumentModel? result;
+      if (isUpdatingExistingDraft) {
+        result = await docProvider.updateDocument(int.parse(_documentId!), document);
+      } else {
+        result = await docProvider.createDocument(document);
+      }
+
       if (!mounted) return;
-      ErrorHandler.showErrorSnackBar(context, 'Erro: $e');
+
+      if (result != null) {
+        ErrorHandler.showSuccessSnackBar(context, 'Rascunho salvo com sucesso!');
+        if (!isUpdatingExistingDraft && result.id != null) {
+          // If it was a new draft and successfully created, update the _documentId
+          setState(() {
+            _documentId = result!.id.toString();
+            // Optionally update the number controller if it was auto-generated
+            if (_numberController.text.startsWith('DRAFT-')) {
+              _numberController.text = result.number;
+            }
+          });
+        }
+        // Decide whether to pop or stay. For drafts, usually stay.
+        // Navigator.of(context).pop(true); 
+      } else {
+        ErrorHandler.showErrorSnackBar(context, 'Erro ao salvar rascunho: ${docProvider.error ?? "Erro desconhecido"}');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ErrorHandler.showErrorSnackBar(context, 'Erro ao salvar rascunho: ${e.toString()}');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -368,6 +444,37 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
     if (_items.isEmpty) {
       ErrorHandler.showErrorSnackBar(context, 'Adicione pelo menos um item ao documento');
       return;
+    }
+
+    // VALIDATION: Check if all items have a stockItemId
+    for (var i = 0; i < _items.length; i++) {
+      final item = _items[i];
+      // Ensure stockItemId is not null and not zero (or any other invalid placeholder)
+      if (item.stockItemId == null || item.stockItemId == 0) { 
+        ErrorHandler.showErrorSnackBar(
+          context, 
+          'Erro no item ${i + 1} "${item.description}": ID do item de estoque ausente ou inválido. Remova e adicione o item novamente.'
+        );
+        return;
+      }
+      
+      // Additional validation: ensure the description is not empty
+      if (item.description.trim().isEmpty) {
+        ErrorHandler.showErrorSnackBar(
+          context, 
+          'Erro no item ${i + 1}: Descrição do item não pode estar vazia.'
+        );
+        return;
+      }
+      
+      // Additional validation: ensure positive quantity
+      if (item.quantity <= 0) {
+        ErrorHandler.showErrorSnackBar(
+          context, 
+          'Erro no item ${i + 1} "${item.description}": Quantidade deve ser maior que zero.'
+        );
+        return;
+      }
     }
 
     // Validações específicas por tipo
@@ -403,30 +510,30 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
-      if (storeId == null) {
+      final storeProvider = Provider.of<StoreProvider>(context, listen: false);
+      if (storeProvider.selectedStoreId == null) {
         throw Exception('Nenhuma loja selecionada');
       }
 
+      // Calculate total value
+      double totalValue = _items.fold(0.0, (sum, item) => sum + item.totalValue);
+
       // Criar documento com status PROCESSED
-      final document = doc_model.Document(
-        id: _documentId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      final document = DocumentModel(
+        id: _documentId != null ? int.tryParse(_documentId!) : null,
         number: _numberController.text.isEmpty 
             ? 'DOC-${DateTime.now().millisecondsSinceEpoch}' 
             : _numberController.text,
-        type: _selectedType,
+        type: _documentTypeToString(_selectedType),
+        description: "Documento ${_documentTypeToString(_selectedType)} - ${_numberController.text}",
+        totalValue: totalValue,
         date: DateTime.now().toIso8601String().split('T')[0], // YYYY-MM-DD format
-        reference: _referenceController.text,
-        notes: _notesController.text,
-        items: _items,
-        customerId: _selectedCustomer?.id.toString(),
-        supplierId: _selectedSupplier?.id.toString(),
-        sourceWarehouseId: _selectedSourceWarehouseId?.toString(),
-        destinationWarehouseId: _selectedDestinationWarehouseId?.toString(),
         status: 'PROCESSED',
-        createdAt: DateTime.now().toIso8601String(),
-        updatedAt: DateTime.now().toIso8601String(),
-      );      // Processar documento no backend (que deve atualizar o estoque automaticamente)
+        storeId: storeProvider.selectedStoreId!,
+        items: _items,
+      );
+
+      // Processar documento no backend (que deve atualizar o estoque automaticamente)
       final docProvider = Provider.of<DocumentProvider>(context, listen: false);
       
       // For adjustment mode, always create a new document (even if we have a documentId from base)
@@ -470,11 +577,11 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
   // Helper para converter DocumentType para String
   String documentTypeToString(DocumentType type) {
     switch (type) {
-      case doc_model.DocumentType.entrada:
+      case DocumentType.entrada:
         return 'Entrada';
-      case doc_model.DocumentType.saida:
+      case DocumentType.saida:
         return 'Saída';
-      case doc_model.DocumentType.unknown:
+      case DocumentType.unknown:
         return 'Desconhecido';
     }
   }
@@ -526,8 +633,8 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                     DropdownButtonFormField<DocumentType>(
                       value: _selectedType,
                       decoration: const InputDecoration(labelText: "Tipo de Documento*"),
-                      items: doc_model.DocumentType.values
-                          .where((t) => t != doc_model.DocumentType.unknown)
+                      items: DocumentType.values
+                          .where((t) => t != DocumentType.unknown)
                           .map((type) => DropdownMenuItem(
                                 value: type,
                                 child: Text(documentTypeToString(type)),
@@ -537,15 +644,15 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                         if (value != null) {
                           setState(() {
                             _selectedType = value;
-                            if (_selectedType != doc_model.DocumentType.saida) _selectedCustomer = null;
-                            if (_selectedType != doc_model.DocumentType.entrada) _selectedSupplier = null;
+                            if (_selectedType != DocumentType.saida) _selectedCustomer = null;
+                            if (_selectedType != DocumentType.entrada) _selectedSupplier = null;
                           });
                         }
                       },
                     ),
                     const SizedBox(height: 16),
                     // Mostrar dropdown de Cliente apenas para SAIDA
-                    if (_selectedType == doc_model.DocumentType.saida)
+                    if (_selectedType == DocumentType.saida)
                       DropdownButtonFormField<Customer>(
                         value: _selectedCustomer,
                         decoration: const InputDecoration(labelText: "Cliente*"),
@@ -563,7 +670,7 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                         },
                       ),
                     // Mostrar dropdown de Fornecedor apenas para ENTRADA
-                    if (_selectedType == doc_model.DocumentType.entrada)
+                    if (_selectedType == DocumentType.entrada)
                       DropdownButtonFormField<Supplier>(
                         value: _selectedSupplier,
                         decoration: const InputDecoration(labelText: "Fornecedor*"),
@@ -671,12 +778,12 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                         final item = _items[index];
                         return Card(
                           child: ListTile(
-                            title: Text(item.name),
-                            subtitle: Text('${item.quantity} ${item.unit} - R\$ ${item.price.toStringAsFixed(2)}'),
+                            title: Text(item.description),
+                            subtitle: Text('Quantidade: ${item.quantity} - R\$ ${item.unitValue.toStringAsFixed(2)} cada'),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text('R\$ ${(item.quantity * item.price).toStringAsFixed(2)}', 
+                                Text('R\$ ${item.totalValue.toStringAsFixed(2)}', 
                                      style: const TextStyle(fontWeight: FontWeight.bold)),
                                 IconButton(
                                   icon: const Icon(Icons.delete),
@@ -703,7 +810,7 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                               ),
                               Text(
-                                'R\$ ${_items.fold(0.0, (sum, item) => sum + (item.quantity * item.price)).toStringAsFixed(2)}',
+                                'R\$ ${_items.fold(0.0, (sum, item) => sum + item.totalValue).toStringAsFixed(2)}',
                                 style: TextStyle(
                                   fontSize: 20, 
                                   fontWeight: FontWeight.bold,

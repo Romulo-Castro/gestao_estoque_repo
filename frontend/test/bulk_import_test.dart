@@ -1,7 +1,7 @@
 // test/bulk_import_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'dart:io';
-import 'package:frontend/services/bulk_import_service.dart';
+import 'package:frontend/shared/services/bulk_import_service.dart';
 
 void main() {
   group('Bulk Import Service Tests', () {

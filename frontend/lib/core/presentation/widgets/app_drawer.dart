@@ -1,7 +1,7 @@
 // lib/core/presentation/widgets/app_drawer.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../shared/utils/app_routes.dart';
+import '../../../main.dart';
 import '../providers/auth_provider.dart';
 import '../providers/store_provider.dart';
 import '../../../shared/utils/error_handler.dart';
@@ -177,19 +177,34 @@ class AppDrawer extends StatelessWidget {
               Navigator.pushNamed(context, AppRoutes.storeManagement);
             },
           ),
-          const Spacer(), // Empurra o item de logout para o final
+          // Use SizedBox instead of Spacer in ListView
+          SizedBox(height: MediaQuery.of(context).size.height * 0.1),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Sair'),
             onTap: () async {
-              // Perform logout then close drawer
+              // Perform logout
               await authProvider.logout();
-              Navigator.of(context).pop();
-              // Defer navigation to after drawer close
+              
+              // Check if the widget is still mounted before popping
+              if (context.mounted) {
+                Navigator.of(context).pop(); // Close the drawer
+              }
+
+              // Defer navigation to after drawer close and ensure context is valid
+              // for the navigation call itself.
+              // No need for another mounted check here as addPostFrameCallback
+              // defers the execution, and the navigator uses a new context.
               WidgetsBinding.instance.addPostFrameCallback((_) {
+                // It's generally safer to use the context from the builder of MaterialApp 
+                // or a context that is known to be alive for global navigations.
+                // However, for this pattern, the context passed to pushNamedAndRemoveUntil
+                // should ideally be one that's still valid.
+                // If issues persist, consider obtaining a global navigator key's context.
                 Navigator.pushNamedAndRemoveUntil(
-                  context,
+                  context, // This context might be an issue if AppDrawer is disposed quickly.
+                           // A more robust solution might involve a global navigator key.
                   AppRoutes.login,
                   (route) => false,
                 );

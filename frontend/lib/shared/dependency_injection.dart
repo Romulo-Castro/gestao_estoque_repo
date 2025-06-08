@@ -14,6 +14,9 @@ import '../core/data/repositories/document_repository_impl.dart';
 // Presentation
 import '../core/presentation/providers/clean_document_provider.dart';
 
+// Config
+import 'config/app_config.dart';
+
 final getIt = GetIt.instance;
 
 Future<void> initializeDependencies() async {
@@ -24,7 +27,7 @@ Future<void> initializeDependencies() async {
   getIt.registerLazySingleton<DocumentRemoteDataSource>(
     () => DocumentRemoteDataSourceImpl(
       httpClient: getIt(),
-      baseUrl: 'http://localhost:3000', // TODO: Move to config
+      baseUrl: AppConfig.baseUrl,
     ),
   );
 

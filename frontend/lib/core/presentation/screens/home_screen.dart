@@ -5,7 +5,6 @@ import '../../../main.dart'; // Para AppRoutes
 import '../providers/store_provider.dart';
 import '../providers/dashboard_provider.dart';
 import '../widgets/app_drawer.dart'; // Importar o Drawer
-import '../widgets/home_card.dart'; // Importar o Card
 import '../widgets/barcode_scanner_page.dart'; // Importar o scanner
 import '../../../shared/utils/error_handler.dart';
 
@@ -39,6 +38,182 @@ class _HomeScreenState extends State<HomeScreen> {
   // Helper para criar uma nova loja
   void _navigateToCreateStore(BuildContext context) {
     Navigator.pushNamed(context, AppRoutes.storeManagement, arguments: null);
+  }
+
+  // Helper methods for minimalist cards
+  Widget _buildPrimaryCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    Color? iconColor,
+    int? count,
+    bool isLoading = false,
+    VoidCallback? onTap,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      elevation: 4.0,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12.0),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 48.0,
+                color: iconColor ?? colorScheme.primary,
+              ),
+              const SizedBox(height: 12.0),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (count != null) ...[
+                const SizedBox(height: 8.0),
+                isLoading
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: iconColor ?? colorScheme.primary,
+                        ),
+                      )
+                    : Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: (iconColor ?? colorScheme.primary).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          count.toString(),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: iconColor ?? colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    Color? iconColor,
+    VoidCallback? onTap,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      elevation: 2.0,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12.0),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 32.0,
+                color: iconColor ?? colorScheme.primary,
+              ),
+              const SizedBox(height: 8.0),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecondaryCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    Color? iconColor,
+    int? count,
+    bool isLoading = false,
+    VoidCallback? onTap,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      elevation: 1.0,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8.0),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 28.0,
+                color: iconColor ?? colorScheme.primary,
+              ),
+              const SizedBox(height: 4.0),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (count != null) ...[
+                const SizedBox(height: 2.0),
+                isLoading
+                    ? SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: iconColor ?? colorScheme.primary,
+                        ),
+                      )
+                    : Text(
+                        count.toString(),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: iconColor ?? colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // Helper para o conteúdo principal da tela
@@ -98,9 +273,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final selectedStoreName = storeProvider.selectedStore?.name ?? "Todas as Lojas";
 
     // nenhuma seleção específica = todas as lojas
-
-    double screenWidth = MediaQuery.of(context).size.width;
-    int crossAxisCount = screenWidth < 600 ? 2 : (screenWidth < 900 ? 3 : 4);
 
     return Column(
       children: [
@@ -185,122 +357,161 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // --- Grid de Cards ---
         Expanded(
-          child: GridView.count(
-            crossAxisCount: crossAxisCount,
+          child: Padding(
             padding: const EdgeInsets.all(16.0),
-            mainAxisSpacing: 16.0,
-            crossAxisSpacing: 16.0,
-            children: <Widget>[
-              // --- Cards de Funcionalidade ---
-              HomeCard(
-                title: "Mercadorias",
-                icon: Icons.inventory_2_outlined,
-                count: dashboardProvider.stats.totalProducts,
-                isLoading: dashboardProvider.isLoading,
-                onTap: () {
-                  // Permite acesso quando há ao menos uma loja (ou Todas as Lojas)
-                  if (storeProvider.stores.isEmpty) {
-                    ErrorHandler.showErrorSnackBar(context, "Nenhuma loja cadastrada.");
-                    return;
-                  }
-                  Navigator.pushNamed(context, AppRoutes.stockList);
-                },
-              ),
-              HomeCard(
-                title: "Documentos",
-                icon: Icons.receipt_long_outlined,
-                iconColor: Colors.orange[700],
-                count: dashboardProvider.stats.totalDocuments,
-                isLoading: dashboardProvider.isLoading,
-                onTap: () => Navigator.pushNamed(context, AppRoutes.documentList),
-              ),              HomeCard(
-                title: "Relatórios",
-                icon: Icons.assessment_outlined,
-                iconColor: Colors.blue[700],
-                onTap: () => Navigator.pushNamed(context, AppRoutes.reports),
-              ),
-              HomeCard(
-                title: "Importar Excel/CSV",
-                icon: Icons.file_upload_outlined,
-                iconColor: Colors.indigo[700],
-                onTap: () {
-                  if (storeProvider.selectedStoreId == null) {
-                    ErrorHandler.showErrorSnackBar(context, "Selecione uma loja primeiro.");
-                    return;
-                  }
-                  Navigator.pushNamed(context, AppRoutes.bulkImport);
-                },
-              ),              HomeCard(
-                title: "Despesas",
-                icon: Icons.wallet_outlined,
-                iconColor: Colors.red[700],
-                onTap: () => Navigator.pushNamed(context, AppRoutes.expenses),
-              ),
-              HomeCard(
-                title: "Nova Entrada",
-                icon: Icons.add_shopping_cart_outlined,
-                iconColor: Colors.green[700],
-                onTap: () => Navigator.pushNamed(
-                  context, 
-                  AppRoutes.editDocument, 
-                  arguments: {'type': 'ENTRADA'}
+            child: Column(
+              children: [
+                // Primary Actions Row
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildPrimaryCard(
+                        context,
+                        title: "Mercadorias",
+                        icon: Icons.inventory_2_outlined,
+                        count: dashboardProvider.stats.totalProducts,
+                        isLoading: dashboardProvider.isLoading,
+                        onTap: () {
+                          if (storeProvider.stores.isEmpty) {
+                            ErrorHandler.showErrorSnackBar(context, "Nenhuma loja cadastrada.");
+                            return;
+                          }
+                          Navigator.pushNamed(context, AppRoutes.stockList);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildPrimaryCard(
+                        context,
+                        title: "Documentos",
+                        icon: Icons.receipt_long_outlined,
+                        iconColor: Colors.orange[700],
+                        count: dashboardProvider.stats.totalDocuments,
+                        isLoading: dashboardProvider.isLoading,
+                        onTap: () => Navigator.pushNamed(context, AppRoutes.documentList),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              HomeCard(
-                title: "Nova Saída",
-                icon: Icons.remove_shopping_cart_outlined,
-                iconColor: Colors.redAccent[700],
-                onTap: () => Navigator.pushNamed(
-                  context, 
-                  AppRoutes.editDocument, 
-                  arguments: {'type': 'SAIDA'}
+                const SizedBox(height: 16),
+                
+                // Quick Actions Row
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildActionCard(
+                        context,
+                        title: "Nova Entrada",
+                        icon: Icons.add_shopping_cart_outlined,
+                        iconColor: Colors.green[700],
+                        onTap: () => Navigator.pushNamed(
+                          context, 
+                          AppRoutes.editDocument, 
+                          arguments: {'type': 'ENTRADA'}
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildActionCard(
+                        context,
+                        title: "Nova Saída",
+                        icon: Icons.remove_shopping_cart_outlined,
+                        iconColor: Colors.redAccent[700],
+                        onTap: () => Navigator.pushNamed(
+                          context, 
+                          AppRoutes.editDocument, 
+                          arguments: {'type': 'SAIDA'}
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildActionCard(
+                        context,
+                        title: "Ler Código",
+                        icon: Icons.qr_code_scanner_outlined,
+                        iconColor: Colors.purple[700],
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const BarcodeScannerPage(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),              HomeCard(
-                title: "Ler Código",
-                icon: Icons.qr_code_scanner_outlined,
-                iconColor: Colors.purple[700],
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const BarcodeScannerPage(),
+                const SizedBox(height: 24),
+                
+                // Secondary Features Grid
+                Expanded(
+                  child: GridView.count(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 12.0,
+                    crossAxisSpacing: 12.0,
+                    childAspectRatio: 1.2,
+                    children: [
+                      _buildSecondaryCard(
+                        context,
+                        title: "Relatórios",
+                        icon: Icons.assessment_outlined,
+                        iconColor: Colors.blue[700],
+                        onTap: () => Navigator.pushNamed(context, AppRoutes.reports),
+                      ),
+                      _buildSecondaryCard(
+                        context,
+                        title: "Clientes",
+                        icon: Icons.people_alt_outlined,
+                        iconColor: Colors.lightBlue[700],
+                        count: dashboardProvider.stats.totalCustomers,
+                        isLoading: dashboardProvider.isLoading,
+                        onTap: () => Navigator.pushNamed(context, AppRoutes.customerList),
+                      ),
+                      _buildSecondaryCard(
+                        context,
+                        title: "Fornecedores",
+                        icon: Icons.groups_outlined,
+                        iconColor: Colors.brown[700],
+                        count: dashboardProvider.stats.totalSuppliers,
+                        isLoading: dashboardProvider.isLoading,
+                        onTap: () => Navigator.pushNamed(context, AppRoutes.supplierList),
+                      ),
+                      _buildSecondaryCard(
+                        context,
+                        title: "Grupos",
+                        icon: Icons.category_outlined,
+                        iconColor: Colors.amber[700],
+                        count: dashboardProvider.stats.totalGroups,
+                        isLoading: dashboardProvider.isLoading,
+                        onTap: () => Navigator.pushNamed(context, AppRoutes.itemGroupList),
+                      ),
+                      _buildSecondaryCard(
+                        context,
+                        title: "Importar",
+                        icon: Icons.file_upload_outlined,
+                        iconColor: Colors.indigo[700],
+                        onTap: () {
+                          if (storeProvider.selectedStoreId == null) {
+                            ErrorHandler.showErrorSnackBar(context, "Selecione uma loja primeiro.");
+                            return;
+                          }
+                          Navigator.pushNamed(context, AppRoutes.bulkImport);
+                        },
+                      ),
+                      _buildSecondaryCard(
+                        context,
+                        title: "Configurações",
+                        icon: Icons.settings_outlined,
+                        iconColor: Colors.grey[700],
+                        onTap: () => Navigator.pushNamed(context, AppRoutes.settings),
+                      ),
+                    ],
                   ),
                 ),
-              ),              HomeCard(
-                title: "Ajuda",
-                icon: Icons.help_outline_outlined,
-                iconColor: Colors.teal[700],
-                onTap: () => Navigator.pushNamed(context, AppRoutes.help),
-              ),
-              HomeCard(
-                title: "Clientes",
-                icon: Icons.people_alt_outlined,
-                iconColor: Colors.lightBlue[700],
-                count: dashboardProvider.stats.totalCustomers,
-                isLoading: dashboardProvider.isLoading,
-                onTap: () => Navigator.pushNamed(context, AppRoutes.customerList),
-              ),
-              HomeCard(
-                title: "Fornecedores",
-                icon: Icons.groups_outlined,
-                iconColor: Colors.brown[700],
-                count: dashboardProvider.stats.totalSuppliers,
-                isLoading: dashboardProvider.isLoading,
-                onTap: () => Navigator.pushNamed(context, AppRoutes.supplierList),
-              ),
-              HomeCard(
-                title: "Grupos",
-                icon: Icons.category_outlined,
-                iconColor: Colors.amber[700],
-                count: dashboardProvider.stats.totalGroups,
-                isLoading: dashboardProvider.isLoading,
-                onTap: () => Navigator.pushNamed(context, AppRoutes.itemGroupList),
-              ),              HomeCard(
-                title: "Configurações",
-                icon: Icons.settings_outlined,
-                iconColor: Colors.grey[700],
-                onTap: () => Navigator.pushNamed(context, AppRoutes.settings),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],

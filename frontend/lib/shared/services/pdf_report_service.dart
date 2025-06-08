@@ -7,9 +7,9 @@ import 'package:printing/printing.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:intl/intl.dart';
-import '../../models/stock_item.dart';
-import '../../models/document_model.dart';
-import '../../models/store_model.dart';
+import '../../core/data/models/stock_item.dart';
+import '../../core/data/models/document_model.dart';
+import '../../core/data/models/store_model.dart';
 
 class PdfReportService {
   static final DateFormat _dateFormat = DateFormat('dd/MM/yyyy');
@@ -46,7 +46,7 @@ class PdfReportService {
 
   /// Gera relatório de documentos em PDF
   static Future<Uint8List> generateDocumentReport({
-    required List<Document> documents,
+    required List<DocumentModel> documents,
     required Store store,
     String? title,
     String? documentType,
@@ -78,7 +78,7 @@ class PdfReportService {
 
   /// Gera relatório financeiro em PDF
   static Future<Uint8List> generateFinancialReport({
-    required List<Document> documents,
+    required List<DocumentModel> documents,
     required Store store,
     required DateTime startDate,
     required DateTime endDate,
@@ -88,13 +88,13 @@ class PdfReportService {
     final reportTitle = title ?? 'Relatório Financeiro';
 
     // Calcular totais
-    final entradas = documents.where((d) => d.type == DocumentType.entrada).toList();
-    final saidas = documents.where((d) => d.type == DocumentType.saida).toList();
+    final entradas = documents.where((d) => d.type == 'entrada').toList();
+    final saidas = documents.where((d) => d.type == 'saida').toList();
 
     final totalEntradas = entradas.fold<double>(0, (sum, doc) => 
-        sum + doc.items.fold<double>(0, (itemSum, item) => itemSum + (item.quantity * item.price)));
+        sum + doc.items.fold<double>(0, (itemSum, item) => itemSum + (item.quantity * item.unitValue)));
     final totalSaidas = saidas.fold<double>(0, (sum, doc) => 
-        sum + doc.items.fold<double>(0, (itemSum, item) => itemSum + (item.quantity * item.price)));
+        sum + doc.items.fold<double>(0, (itemSum, item) => itemSum + (item.quantity * item.unitValue)));
 
     pdf.addPage(
       pw.MultiPage(
@@ -248,10 +248,10 @@ class PdfReportService {
     );
   }
 
-  static pw.Widget _buildDocumentSummary(List<Document> documents) {
+  static pw.Widget _buildDocumentSummary(List<DocumentModel> documents) {
     final totalDocs = documents.length;
-    final entraDocs = documents.where((d) => d.type == DocumentType.entrada).length;
-    final saidaDocs = documents.where((d) => d.type == DocumentType.saida).length;
+    final entraDocs = documents.where((d) => d.type == 'entrada').length;
+    final saidaDocs = documents.where((d) => d.type == 'saida').length;
     final processedDocs = documents.where((d) => d.status == 'PROCESSED').length;
 
     return pw.Container(
@@ -272,7 +272,7 @@ class PdfReportService {
     );
   }
 
-  static pw.Widget _buildDocumentTable(List<Document> documents) {
+  static pw.Widget _buildDocumentTable(List<DocumentModel> documents) {
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.grey300),
       columnWidths: {
@@ -298,7 +298,7 @@ class PdfReportService {
         ...documents.map((doc) => pw.TableRow(
           children: [
             _buildTableCell(doc.number),
-            _buildTableCell(documentTypeToString(doc.type)),
+            _buildTableCell(doc.type),
             _buildTableCell(doc.date),
             _buildTableCell(doc.items.length.toString()),
             _buildTableCell(doc.status),
@@ -352,7 +352,7 @@ class PdfReportService {
     );
   }
 
-  static pw.Widget _buildFinancialCharts(List<Document> entradas, List<Document> saidas) {
+  static pw.Widget _buildFinancialCharts(List<DocumentModel> entradas, List<DocumentModel> saidas) {
     // Aqui você pode adicionar gráficos simples usando pw.Chart
     // Por simplicidade, vou apenas mostrar um resumo por tipo
     return pw.Container(
@@ -373,12 +373,12 @@ class PdfReportService {
     );
   }
 
-  static pw.Widget _buildTopItems(List<Document> documents) {
+  static pw.Widget _buildTopItems(List<DocumentModel> documents) {
     // Contar itens mais movimentados
     final itemCounts = <String, int>{};
     for (final doc in documents) {
       for (final item in doc.items) {
-        itemCounts[item.name] = (itemCounts[item.name] ?? 0) + 1;
+        itemCounts[item.description] = (itemCounts[item.description] ?? 0) + 1;
       }
     }
 

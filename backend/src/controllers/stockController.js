@@ -186,8 +186,21 @@ exports.uploadStockItemImage = catchAsync(async (req, res, next) => {
         throw new AppError('Nenhuma imagem foi enviada.', 400);
     }
 
+    // Validação adicional de tamanho e tipo
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (req.file.size > maxSize) {
+        // Remove arquivo se muito grande
+        fs.unlink(req.file.path, (err) => {
+            if (err) console.error(`Erro ao remover arquivo grande ${req.file.path}:`, err);
+        });
+        throw new AppError('Arquivo muito grande. Limite máximo: 10MB.', 400);
+    }
+
     const imageFilename = req.file.filename;
     let oldImagePath = null;
+
+    console.log(`Iniciando upload de imagem para item ${itemId}, loja ${storeId}`);
+    console.log(`Arquivo recebido: ${req.file.originalname} (${req.file.size} bytes)`);
 
     try {
         const item = await db.findStockItemByIdAndStore(itemId, storeId);
@@ -202,14 +215,20 @@ exports.uploadStockItemImage = catchAsync(async (req, res, next) => {
         // Se item já tem imagem, prepara para remover a antiga
         if (item.image_filename) {
             oldImagePath = path.resolve(__dirname, '../../', UPLOAD_DIR, item.image_filename);
+            console.log(`Item já possui imagem: ${item.image_filename}, será substituída`);
         }
 
         await db.updateStockItemImageFilename(itemId, storeId, imageFilename);
+        console.log(`Imagem ${imageFilename} associada ao item ${itemId} com sucesso`);
 
         // Remove imagem antiga se existia
         if (oldImagePath) {
             fs.unlink(oldImagePath, (err) => {
-                if (err) console.error(`Erro ao remover imagem antiga ${oldImagePath}:`, err);
+                if (err) {
+                    console.error(`Erro ao remover imagem antiga ${oldImagePath}:`, err);
+                } else {
+                    console.log(`Imagem antiga removida: ${oldImagePath}`);
+                }
             });
         }
 
@@ -224,10 +243,12 @@ exports.uploadStockItemImage = catchAsync(async (req, res, next) => {
             imageUrl: buildImageUrl(updatedItem.image_filename)
         };
         
-        sendSuccessResponse(res, itemWithUrl, 'Imagem enviada com sucesso');
+        console.log(`Upload concluído com sucesso. URL da imagem: ${itemWithUrl.imageUrl}`);
+        sendSuccessResponse(res, itemWithUrl, `Imagem '${req.file.originalname}' enviada com sucesso`);
 
     } catch (dbError) {
         // Remove arquivo uploaded em caso de erro
+        console.error(`Erro durante upload, removendo arquivo ${req.file.path}:`, dbError);
         fs.unlink(req.file.path, (err) => {
             if (err) console.error(`Erro ao remover ${req.file.path} após falha:`, err);
         });

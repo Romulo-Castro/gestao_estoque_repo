@@ -3,11 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/document_model.dart';
 import '../../data/models/balance_sheet_model.dart';
+import '../../domain/entities/document_entity.dart';
 import '../providers/document_provider.dart';
 import '../providers/store_provider.dart';
 import '../screens/edit_document_screen.dart';
 import '../screens/document_detail_screen.dart';
 import '../widgets/app_drawer.dart';
+import '../../../shared/utils/logger.dart';
 import '../widgets/improved_balance_sheet_widget.dart';
 import '../../../shared/services/csv_export_service.dart';
 import '../../../shared/utils/error_handler.dart';
@@ -82,10 +84,21 @@ class _DocumentListScreenState extends State<DocumentListScreen>
         return 'Entrada';
       case 'saida':
       case 'saída':
-        return 'Saída';
-      default:
+        return 'Saída';      default:
         return 'Desconhecido';
     }  }
+
+  DocumentType? _stringToDocumentType(String? typeString) {
+    if (typeString == null) return null;
+    switch (typeString.toLowerCase()) {
+      case 'entrada':
+        return DocumentType.entrada;
+      case 'saida':
+        return DocumentType.saida;
+      default:
+        return DocumentType.unknown;
+    }
+  }
   
   // Filter documents based on selected tab and search query
   List<DocumentModel> _getFilteredDocuments(List<DocumentModel> documents, String filter) {
@@ -291,12 +304,11 @@ class _DocumentListScreenState extends State<DocumentListScreen>
       }
     }
   }
-
   Future<void> _generateReceiptForSelected() async {
     try {
       final docProvider = Provider.of<DocumentProvider>(context, listen: false);
       final selectedDocs = docProvider.documents
-          .where((doc) => _selectedDocuments.contains(doc.id))
+          .where((doc) => _selectedDocuments.contains(doc.id?.toString()))
           .toList();
       
       if (selectedDocs.isEmpty) {
@@ -348,12 +360,11 @@ class _DocumentListScreenState extends State<DocumentListScreen>
       }
     }
   }
-
   Future<void> _printSelectedDocuments() async {
     try {
       final docProvider = Provider.of<DocumentProvider>(context, listen: false);
       final selectedDocs = docProvider.documents
-          .where((doc) => _selectedDocuments.contains(doc.id))
+          .where((doc) => _selectedDocuments.contains(doc.id?.toString()))
           .toList();
       
       if (selectedDocs.isEmpty) {
@@ -577,12 +588,11 @@ class _DocumentListScreenState extends State<DocumentListScreen>
           children: _tabFilters.map((filter) {
             final filteredDocs = _getFilteredDocuments(docProvider.documents, filter);
               // Special handling for Balance Sheet tab
-            if (filter == 'BALANÇA') {
-              print('[DocumentListScreen] BALANÇA tab - Total documents: ${docProvider.documents.length}');
-              print('[DocumentListScreen] BALANÇA tab - Filtered documents: ${filteredDocs.length}');
+            if (filter == 'BALANÇA') {              AppLogger.info('BALANÇA tab - Total documents: ${docProvider.documents.length}', 'DocumentListScreen');
+              AppLogger.info('BALANÇA tab - Filtered documents: ${filteredDocs.length}', 'DocumentListScreen');
               for (var doc in filteredDocs) {
-                print('[DocumentListScreen] Document: ${doc.number}, Type: ${doc.type}, Date: ${doc.date}, Status: ${doc.status}');
-              }              return ImprovedBalanceSheetWidget(
+                AppLogger.debug('Document: ${doc.number}, Type: ${doc.type}, Date: ${doc.date}, Status: ${doc.status}', 'DocumentListScreen');
+              }return ImprovedBalanceSheetWidget(
                 documents: filteredDocs,
                 onExportBalanceSheet: _exportDocuments,
               );
@@ -594,8 +604,7 @@ class _DocumentListScreenState extends State<DocumentListScreen>
       },
     );
   }
-
-  Widget _buildDocumentListView(List<Document> documents) {
+  Widget _buildDocumentListView(List<DocumentModel> documents) {
     if (documents.isEmpty) {
       return const Center(
         child: Text("Nenhum documento encontrado nesta categoria."),
@@ -657,8 +666,7 @@ class _DocumentListScreenState extends State<DocumentListScreen>
                         fontWeight: FontWeight.w600,
                         color: Colors.black87,
                       ),
-                    ),
-                    const SizedBox(height: 4),
+                    ),                    const SizedBox(height: 4),
                     // Date and type
                     Text(
                       "$formattedDate • ${_getDocumentTypeDisplayName(doc.type)}",
@@ -791,10 +799,9 @@ class _DocumentListScreenState extends State<DocumentListScreen>
             defaultType = null;
             break;
         }
-        
-        Navigator.of(context).push(
+          Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (ctx) => EditDocumentScreen(defaultType: defaultType),
+            builder: (ctx) => EditDocumentScreen(defaultType: _stringToDocumentType(defaultType)),
           ),
         );
       },

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/balance_sheet_model.dart';
 import '../../data/models/document_model.dart';
+import '../../domain/entities/document_entity.dart';
+import '../../../shared/utils/logger.dart';
 
 class ImprovedBalanceSheetWidget extends StatefulWidget {
   final List<DocumentModel> documents;
@@ -43,46 +45,43 @@ class _ImprovedBalanceSheetWidgetState extends State<ImprovedBalanceSheetWidget>
     }
   }
 
-  void _updateBalanceData() {
-    print('[ImprovedBalanceSheetWidget] Starting balance calculation');
-    print('[ImprovedBalanceSheetWidget] Total documents received: ${widget.documents.length}');
+  void _updateBalanceData() {    AppLogger.info('Starting balance calculation', 'ImprovedBalanceSheetWidget');
+    AppLogger.info('Total documents received: ${widget.documents.length}', 'ImprovedBalanceSheetWidget');
     
     if (widget.documents.isEmpty) {
-      print('[ImprovedBalanceSheetWidget] No documents available');
+      AppLogger.warning('No documents available', 'ImprovedBalanceSheetWidget');
       setState(() {
         _balanceData = BalanceSheetData.empty();
       });
       return;
     }    // Filter and validate documents
-    final validDocuments = <models.Document>[];
+    final validDocuments = <DocumentModel>[];
     for (final doc in widget.documents) {
       if (doc.status == 'CANCELADO') {
-        print('[ImprovedBalanceSheetWidget] Skipping cancelled document: ${doc.number}');
+        AppLogger.debug('Skipping cancelled document: ${doc.number}', 'ImprovedBalanceSheetWidget');
         continue;
       }
 
       if (doc.date.isEmpty) {
-        print('[ImprovedBalanceSheetWidget] Document ${doc.number} has empty date - skipping');
+        AppLogger.warning('Document ${doc.number} has empty date - skipping', 'ImprovedBalanceSheetWidget');
         continue;
       }
 
       try {
         final docDate = DateTime.parse(doc.date);
-        final isInPeriod = _selectedPeriod.contains(docDate);
-        print('[ImprovedBalanceSheetWidget] Document ${doc.number}: '
-              'type=${doc.type}, date=${doc.date}, value=${doc.totalAmount}, '
-              'status=${doc.status}, inPeriod=$isInPeriod');
+        final isInPeriod = _selectedPeriod.contains(docDate);        AppLogger.debug('Document ${doc.number}: '
+              'type=${doc.type}, date=${doc.date}, value=${doc.totalValue}, '
+              'status=${doc.status}, inPeriod=$isInPeriod', 'ImprovedBalanceSheetWidget');
         
         if (isInPeriod) {
           validDocuments.add(doc);
         }
-      } catch (e) {
-        print('[ImprovedBalanceSheetWidget] Failed to parse date for document ${doc.number}: '
-              '${doc.date}, error: $e');
+      } catch (e) {        AppLogger.error('Failed to parse date for document ${doc.number}: '
+              '${doc.date}', 'ImprovedBalanceSheetWidget', e);
       }
     }
 
-    print('[ImprovedBalanceSheetWidget] Valid documents for calculation: ${validDocuments.length}');
+    AppLogger.info('Valid documents for calculation: ${validDocuments.length}', 'ImprovedBalanceSheetWidget');
 
     // Calculate balance using both current and improved logic
     setState(() {
@@ -93,42 +92,39 @@ class _ImprovedBalanceSheetWidgetState extends State<ImprovedBalanceSheetWidget>
       double totalOutflows = 0.0;
       int inflowCount = 0;
       int outflowCount = 0;      for (final doc in validDocuments) {
-        if (doc.type == models.DocumentType.entrada) {
-          totalInflows += doc.totalAmount;
+        if (doc.type == 'entrada') {
+          totalInflows += doc.totalValue;
           inflowCount++;
-          print('[ImprovedBalanceSheetWidget] Adding inflow: ${doc.number} = ${doc.totalAmount}');
-        } else if (doc.type == models.DocumentType.saida) {
-          totalOutflows += doc.totalAmount;
+          AppLogger.debug('Adding inflow: ${doc.number} = ${doc.totalValue}', 'ImprovedBalanceSheetWidget');
+        } else if (doc.type == 'saida') {
+          totalOutflows += doc.totalValue;
           outflowCount++;
-          print('[ImprovedBalanceSheetWidget] Adding outflow: ${doc.number} = ${doc.totalAmount}');
+          AppLogger.debug('Adding outflow: ${doc.number} = ${doc.totalValue}', 'ImprovedBalanceSheetWidget');
         }
       }
 
       final netBalance = totalInflows - totalOutflows;
-      
-      print('[ImprovedBalanceSheetWidget] Manual calculation:');
-      print('  - Total Inflows: $totalInflows (count: $inflowCount)');
-      print('  - Total Outflows: $totalOutflows (count: $outflowCount)');
-      print('  - Net Balance: $netBalance');
-      
-      print('[ImprovedBalanceSheetWidget] BalanceSheetData calculation:');
-      print('  - Total Inflows: ${_balanceData.totalInflows}');
-      print('  - Total Outflows: ${_balanceData.totalOutflows}');
-      print('  - Net Balance: ${_balanceData.netBalance}');
+        AppLogger.info('Manual calculation:', 'ImprovedBalanceSheetWidget');
+      AppLogger.info('  - Total Inflows: $totalInflows (count: $inflowCount)', 'ImprovedBalanceSheetWidget');
+      AppLogger.info('  - Total Outflows: $totalOutflows (count: $outflowCount)', 'ImprovedBalanceSheetWidget');
+      AppLogger.info('  - Net Balance: $netBalance', 'ImprovedBalanceSheetWidget');
+        AppLogger.info('BalanceSheetData calculation:', 'ImprovedBalanceSheetWidget');
+      AppLogger.info('  - Total Inflows: ${_balanceData.totalInflows}', 'ImprovedBalanceSheetWidget');
+      AppLogger.info('  - Total Outflows: ${_balanceData.totalOutflows}', 'ImprovedBalanceSheetWidget');
+      AppLogger.info('  - Net Balance: ${_balanceData.netBalance}', 'ImprovedBalanceSheetWidget');
       
       // Verify calculations match
       if ((totalInflows - _balanceData.totalInflows).abs() > 0.01 ||
           (totalOutflows - _balanceData.totalOutflows).abs() > 0.01) {
-        print('[ImprovedBalanceSheetWidget] WARNING: Calculation mismatch detected!');
+        AppLogger.warning('WARNING: Calculation mismatch detected!', 'ImprovedBalanceSheetWidget');
       } else {
-        print('[ImprovedBalanceSheetWidget] Calculations verified - all correct');
+        AppLogger.info('Calculations verified - all correct', 'ImprovedBalanceSheetWidget');
       }
     });
   }
-
   void _onPeriodChanged(BalanceSheetPeriod? period) {
     if (period != null && period != _selectedPeriod) {
-      print('[ImprovedBalanceSheetWidget] Period changed to: ${period.displayName}');
+      AppLogger.info('Period changed to: ${period.displayName}', 'ImprovedBalanceSheetWidget');
       setState(() {
         _selectedPeriod = period;
       });
@@ -190,40 +186,13 @@ class _ImprovedBalanceSheetWidgetState extends State<ImprovedBalanceSheetWidget>
     final formatter = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
     
     return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
+      padding: const EdgeInsets.all(16),      child: Column(
         children: [
-          // Debug info card
-          Card(
-            color: Colors.blue[50],
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Informações de Debug',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue[800],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text('Documentos totais: ${widget.documents.length}'),
-                  Text('Período: ${_selectedPeriod.displayName}'),
-                  Text('Entradas: ${_balanceData.inflowCount}'),
-                  Text('Saídas: ${_balanceData.outflowCount}'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
           // Financial summary cards
           Row(
             children: [
               Expanded(
-                child: _buildSummaryCard(
-                  'Entradas',
+                child: _buildSummaryCard(                  'Entradas',
                   formatter.format(_balanceData.totalInflows),
                   Colors.green,
                   Icons.trending_up,
@@ -366,10 +335,9 @@ class _ImprovedBalanceSheetWidgetState extends State<ImprovedBalanceSheetWidget>
         final item = items[index];
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: ListTile(
-            leading: CircleAvatar(
+          child: ListTile(            leading: CircleAvatar(
               backgroundColor: color.withOpacity(0.1),              child: Icon(
-                item.type == models.DocumentType.entrada 
+                item.type == DocumentType.entrada 
                     ? Icons.trending_up 
                     : Icons.trending_down,
                 color: color,

@@ -43,7 +43,7 @@ router.delete('/:itemId',
 router.post('/:itemId/image',
     validateIdParam('itemId'),
     handleValidationErrors, // Valida ID antes de tentar upload
-    upload.single('productImage'), // Processa upload
+    upload, // Processa upload com tratamento de erro integrado
     stockController.uploadStockItemImage // Associa ao item
 );
 

@@ -55,6 +55,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
+  // Helper method to convert DocumentModel to old Document class for reports
   Future<void> _generateReport() async {
     if (_isLoading) return;
 

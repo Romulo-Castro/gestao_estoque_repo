@@ -1,5 +1,5 @@
 import 'package:intl/intl.dart';
-import '../../models/document_model.dart';
+import '../../core/data/models/document_model.dart';
 import '../../core/data/models/balance_sheet_model.dart';
 
 enum CSVExportContext {
@@ -24,9 +24,9 @@ class CSVExportService {
   }) {
     switch (context) {
       case CSVExportContext.allDocuments:
-        return _generateDocumentsCSV(data as List<Document>, 'Todos os Documentos');
+        return _generateDocumentsCSV(data as List<DocumentModel>, 'Todos os Documentos');
       case CSVExportContext.documentsFiltered:
-        return _generateDocumentsCSV(data as List<Document>, filterDescription ?? 'Documentos Filtrados');
+        return _generateDocumentsCSV(data as List<DocumentModel>, filterDescription ?? 'Documentos Filtrados');
       case CSVExportContext.balanceSheet:
         return _generateBalanceSheetCSV(data as BalanceSheetData);
       case CSVExportContext.stockItems:
@@ -39,7 +39,7 @@ class CSVExportService {
   }
 
   /// Generate CSV for documents
-  static String _generateDocumentsCSV(List<Document> documents, String title) {
+  static String _generateDocumentsCSV(List<DocumentModel> documents, String title) {
     final csvLines = <String>[];
     
     // Header with metadata
@@ -57,34 +57,32 @@ class CSVExportService {
           ? _tryFormatDate(doc.date)
           : "Data inválida";
       
-      final totalValue = doc.items.fold<double>(0.0, (sum, item) => sum + (item.quantity * item.price));
-      
-      final row = [
-        _escapeCSV(doc.id),
+      final totalValue = doc.items.fold<double>(0.0, (sum, item) => sum + (item.quantity * item.unitValue));
+        final row = [
+        _escapeCSV(doc.id?.toString() ?? ''),
         _escapeCSV(doc.number),
-        _escapeCSV(_getDocumentTypeDisplayName(doc.type)),
+        _escapeCSV(doc.type),
         _escapeCSV(formattedDate),
         _escapeCSV(doc.status),
-        _escapeCSV(doc.customerId ?? ''),
-        _escapeCSV(doc.supplierId ?? ''),
-        _escapeCSV(doc.notes ?? ''),
+        _escapeCSV(''), // customerId not available in DocumentModel
+        _escapeCSV(''), // supplierId not available in DocumentModel  
+        _escapeCSV(doc.description),
         doc.items.length.toString(),
         totalValue.toStringAsFixed(2).replaceAll('.', ','),
       ];
       
       csvLines.add(row.join(','));
     }
-    
-    // Summary
+      // Summary
     csvLines.add('');
     csvLines.add('# Resumo por Tipo:');
-    final typeGroups = <DocumentType, int>{};
+    final typeGroups = <String, int>{};
     for (final doc in documents) {
       typeGroups[doc.type] = (typeGroups[doc.type] ?? 0) + 1;
     }
     
     for (final entry in typeGroups.entries) {
-      csvLines.add('# ${_getDocumentTypeDisplayName(entry.key)}: ${entry.value}');
+      csvLines.add('# ${entry.key}: ${entry.value}');
     }
     
     return csvLines.join('\n');
@@ -210,19 +208,7 @@ class CSVExportService {
       return _dateFormat.format(date);
     } catch (e) {
       return dateStr;
-    }
-  }
-  /// Helper method to get document type display name
-  static String _getDocumentTypeDisplayName(DocumentType type) {
-    switch (type) {
-      case DocumentType.entrada:
-        return 'Entrada';
-      case DocumentType.saida:
-        return 'Saída';
-      case DocumentType.unknown:
-        return 'Desconhecido';
-    }
-  }
+    }  }
 
   /// Get contextual filename for export
   static String getContextualFilename(CSVExportContext context, {String? additionalInfo}) {

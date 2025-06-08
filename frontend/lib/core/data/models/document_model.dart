@@ -23,15 +23,22 @@ class DocumentModel {
     required this.storeId,
     required this.items,
   });
-
   factory DocumentModel.fromJson(Map<String, dynamic> json) {
+    // Map backend fields to frontend fields
+    String mappedType = json['type'] ?? 'unknown';
+    if (mappedType == 'sale') {
+      mappedType = 'saida';
+    } else if (mappedType == 'purchase') {
+      mappedType = 'entrada';
+    }
+    
     return DocumentModel(
       id: json['id'],
-      number: json['number'] ?? '',
-      type: json['type'] ?? 'unknown',
-      description: json['description'] ?? '',
-      totalValue: (json['total_value'] ?? 0.0).toDouble(),
-      date: json['date'] ?? '',
+      number: json['number'] ?? json['id']?.toString() ?? '',
+      type: mappedType,
+      description: json['description'] ?? json['notes'] ?? '',
+      totalValue: (json['total_value'] ?? json['total_amount'] ?? 0.0).toDouble(),
+      date: json['date'] ?? json['document_date'] ?? '',
       status: json['status'] ?? 'ATIVO',
       storeId: json['store_id'] ?? 0,
       items: (json['items'] as List<dynamic>?)
@@ -40,15 +47,25 @@ class DocumentModel {
           [],
     );
   }
-
   Map<String, dynamic> toJson() {
+    // Map frontend fields to backend fields
+    String mappedType = type;
+    if (type == 'saida') {
+      mappedType = 'sale';
+    } else if (type == 'entrada') {
+      mappedType = 'purchase';
+    }
+    
     return {
       'id': id,
       'number': number,
-      'type': type,
+      'type': mappedType,
       'description': description,
+      'notes': description, // Backend uses 'notes' field
       'total_value': totalValue,
+      'total_amount': totalValue, // Backend uses 'total_amount' field
       'date': date,
+      'document_date': date, // Backend uses 'document_date' field
       'status': status,
       'store_id': storeId,
       'items': items.map((item) => item.toJson()).toList(),
@@ -116,6 +133,31 @@ class DocumentModel {
       return DateTime.now();
     }
   }
+
+  /// copyWith method for immutable updates
+  DocumentModel copyWith({
+    int? id,
+    String? number,
+    String? type,
+    String? description,
+    double? totalValue,
+    String? date,
+    String? status,
+    int? storeId,
+    List<DocumentItemModel>? items,
+  }) {
+    return DocumentModel(
+      id: id ?? this.id,
+      number: number ?? this.number,
+      type: type ?? this.type,
+      description: description ?? this.description,
+      totalValue: totalValue ?? this.totalValue,
+      date: date ?? this.date,
+      status: status ?? this.status,
+      storeId: storeId ?? this.storeId,
+      items: items ?? this.items,
+    );
+  }
 }
 
 class DocumentItemModel {
@@ -142,7 +184,7 @@ class DocumentItemModel {
       unitValue: (json['unit_value'] ?? 0.0).toDouble(),
       totalValue: (json['total_value'] ?? 0.0).toDouble(),
       description: json['description'] ?? '',
-      stockItemId: json['stock_item_id'],
+      stockItemId: json['stock_item_id'] ?? json['itemId'], // Also check for 'itemId'
     );
   }
 
@@ -153,7 +195,7 @@ class DocumentItemModel {
       'unit_value': unitValue,
       'total_value': totalValue,
       'description': description,
-      'stock_item_id': stockItemId,
+      'itemId': stockItemId, // Changed from 'stock_item_id' to 'itemId'
     };
   }
 

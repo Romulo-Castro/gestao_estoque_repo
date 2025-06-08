@@ -2,8 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../../data/models/user_model.dart'; // Added import for User model
 import '../providers/store_provider.dart';
 import '../providers/layout_provider.dart';
+import '../providers/theme_provider.dart';
 import '../../../shared/utils/app_prefs.dart';
 import '../widgets/app_drawer.dart';
 
@@ -15,7 +17,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _isDarkMode = false;
   bool _useLocalStorage = true;
   bool _showNotifications = true;
   bool _isLoading = false;
@@ -34,7 +35,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     
     try {
       // Carregar configurações do AppPrefs
-      _isDarkMode = await AppPrefs.getBool('darkMode') ?? false;
       _useLocalStorage = await AppPrefs.getBool('useLocalStorage') ?? true;
       _showNotifications = await AppPrefs.getBool('showNotifications') ?? true;
       
@@ -59,7 +59,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     
     try {
       // Salvar configurações no AppPrefs
-      await AppPrefs.setBool('darkMode', _isDarkMode);
       await AppPrefs.setBool('useLocalStorage', _useLocalStorage);
       await AppPrefs.setBool('showNotifications', _showNotifications);
       
@@ -112,7 +111,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     
     if (confirmed == true) {
       setState(() {
-        _isDarkMode = false;
         _useLocalStorage = true;
         _showNotifications = true;
       });
@@ -159,6 +157,73 @@ class _SettingsScreenState extends State<SettingsScreen> {
             duration: Duration(seconds: 2),
           ),
         );
+      }
+    }
+  }
+
+  Future<void> _showEditProfileDialog() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    // final userProfileProvider = Provider.of<UserProfileProvider>(context, listen: false); // Not used in the refactored version
+    final currentUser = authProvider.user;
+
+    if (currentUser == null) return;
+
+    // Show dialog and wait for it to complete
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      barrierDismissible: false, // Prevent closing by tapping outside
+      builder: (ctx) => _EditProfileDialogContent(
+        currentUser: currentUser, // Pass the existing User object
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _isLoading = true;
+      });
+      try {
+        // The backend API for profile update (name, email, password) needs to be called here.
+        // The current AuthProvider.updateUserProfile(User updatedUser) only updates the local state
+        // and does not handle password changes or make an API call for profile updates with passwords.
+        // This is a limitation of the current AuthProvider implementation.
+
+        // For now, we update the local user object with name and email.
+        final updatedUser = User(
+          id: currentUser.id, // Use existing user's ID
+          name: result['name']!,
+          email: result['email']!,
+        );
+        await authProvider.updateUserProfile(updatedUser);
+
+        // TODO: Implement actual API call for profile update including password change.
+        // This would likely involve a new method in AuthProvider and ApiService, e.g.:
+        // await authProvider.updateProfileOnServer(
+        //   name: result['name']!,
+        //   email: result['email']!,
+        //   currentPassword: result['currentPassword'], // Ensure these keys exist in result
+        //   newPassword: result['newPassword'],         // Ensure these keys exist in result
+        // );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Perfil (localmente) atualizado com sucesso! Senha não alterada no servidor.')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erro ao atualizar perfil: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -215,13 +280,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             subtitle: Text(userEmail),
                             trailing: IconButton(
                               icon: const Icon(Icons.edit),
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Edição de perfil será implementada em breve!'),
-                                  ),
-                                );
-                              },
+                              onPressed: () => _showEditProfileDialog(),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -244,31 +303,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 16),
                   
                   // Seção de Aparência
-                  Card(
-                    elevation: 2,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Aparência',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Consumer<ThemeProvider>(
+                    builder: (context, themeProvider, child) {
+                      return Card(
+                        elevation: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Aparência',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                              const Divider(),
+                              SwitchListTile(
+                                title: const Text('Modo Escuro'),
+                                subtitle: const Text('Ativar tema escuro no aplicativo'),
+                                value: themeProvider.isDarkMode,
+                                onChanged: (value) {
+                                  themeProvider.setTheme(value);
+                                },
+                              ),
+                            ],
                           ),
-                          const Divider(),
-                          SwitchListTile(
-                            title: const Text('Modo Escuro'),
-                            subtitle: const Text('Ativar tema escuro no aplicativo'),
-                            value: _isDarkMode,
-                            onChanged: (value) {
-                              setState(() {
-                                _isDarkMode = value;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    },
                   ),
                   
                   const SizedBox(height: 16),
@@ -564,6 +625,197 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+class _EditProfileDialogContent extends StatefulWidget {
+  final User currentUser;
+
+  const _EditProfileDialogContent({required this.currentUser});
+
+  @override
+  _EditProfileDialogContentState createState() => _EditProfileDialogContentState();
+}
+
+class _EditProfileDialogContentState extends State<_EditProfileDialogContent> {
+  late TextEditingController _nameController;
+  late TextEditingController _emailController;
+  late TextEditingController _currentPasswordController;
+  late TextEditingController _newPasswordController;
+  late TextEditingController _confirmPasswordController;
+  bool _changePassword = false;
+  bool _isUpdating = false;
+  final _formKey = GlobalKey<FormState>(); // Add a form key for validation
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.currentUser.name);
+    _emailController = TextEditingController(text: widget.currentUser.email);
+    _currentPasswordController = TextEditingController();
+    _newPasswordController = TextEditingController();
+    _confirmPasswordController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _submitForm() {
+    if (_formKey.currentState!.validate()) {
+      Navigator.of(context).pop({
+        'name': _nameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'currentPassword': _currentPasswordController.text,
+        'newPassword': _newPasswordController.text,
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Editar Perfil'),
+      content: SingleChildScrollView(
+        child: Form( // Wrap with a Form widget
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField( // Use TextFormField for validation
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nome',
+                  prefixIcon: Icon(Icons.person),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Nome é obrigatório';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField( // Use TextFormField for validation
+                controller: _emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Email é obrigatório';
+                  }
+                  if (!value.contains('@')) { // Basic email validation
+                    return 'Email inválido';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              CheckboxListTile(
+                title: const Text('Alterar senha'),
+                value: _changePassword,
+                onChanged: (value) {
+                  setState(() {
+                    _changePassword = value ?? false;
+                    if (!_changePassword) {
+                      _currentPasswordController.clear();
+                      _newPasswordController.clear();
+                      _confirmPasswordController.clear();
+                    }
+                  });
+                },
+              ),
+              if (_changePassword) ...[
+                const SizedBox(height: 8),
+                TextFormField( // Use TextFormField for validation
+                  controller: _currentPasswordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Senha atual',
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
+                  obscureText: true,
+                  validator: (value) {
+                    if (_changePassword && (value == null || value.isEmpty)) {
+                      return 'Senha atual é obrigatória';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField( // Use TextFormField for validation
+                  controller: _newPasswordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nova senha',
+                    prefixIcon: Icon(Icons.lock),
+                  ),
+                  obscureText: true,
+                  validator: (value) {
+                    if (_changePassword && (value == null || value.length < 6)) {
+                      return 'Nova senha deve ter pelo menos 6 caracteres';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField( // Use TextFormField for validation
+                  controller: _confirmPasswordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirmar nova senha',
+                    prefixIcon: Icon(Icons.lock),
+                  ),
+                  obscureText: true,
+                  validator: (value) {
+                    if (_changePassword && value != _newPasswordController.text) {
+                      return 'Confirmação de senha não confere';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isUpdating ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _isUpdating
+              ? null
+              : () async {
+                  if (_formKey.currentState!.validate()) {
+                    setState(() => _isUpdating = true);
+                    // The actual update logic is now handled outside this dialog
+                    // after it pops with the result.
+                    Navigator.of(context).pop({
+                      'name': _nameController.text.trim(),
+                      'email': _emailController.text.trim(),
+                      'currentPassword': _currentPasswordController.text,
+                      'newPassword': _newPasswordController.text,
+                      // No need to pass confirmPasswordController.text
+                    });
+                  } else {
+                     // Show a generic message or rely on TextFormField validators
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Por favor, corrija os erros no formulário.')),
+                    );
+                  }
+                },
+          child: _isUpdating ? const CircularProgressIndicator(strokeWidth: 2) : const Text('Salvar'),
+        ),
+      ],
     );
   }
 }

@@ -1,9 +1,9 @@
 // lib/services/simple_report_service.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../models/stock_item.dart';
-import '../../models/document_model.dart';
-import '../../models/store_model.dart';
+import '../../core/data/models/stock_item.dart';
+import '../../core/data/models/document_model.dart';
+import '../../core/data/models/store_model.dart';
 
 class SimpleReportService {
   static final DateFormat _dateFormat = DateFormat('dd/MM/yyyy');
@@ -66,7 +66,7 @@ class SimpleReportService {
 
   /// Gera relatório de documentos simples como texto
   static Future<String> generateDocumentReport({
-    required List<Document> documents,
+    required List<DocumentModel> documents,
     required Store store,
     String? title,
     String? documentType,
@@ -90,8 +90,8 @@ class SimpleReportService {
     buffer.writeln();
 
     // Summary by type
-    final entradaCount = documents.where((d) => d.type == DocumentType.entrada).length;
-    final saidaCount = documents.where((d) => d.type == DocumentType.saida).length;
+    final entradaCount = documents.where((d) => d.type == 'entrada').length;
+    final saidaCount = documents.where((d) => d.type == 'saida').length;
 
     buffer.writeln('RESUMO:');
     buffer.writeln('-'.padLeft(40, '-'));
@@ -109,9 +109,9 @@ class SimpleReportService {
     for (var doc in documents) {
       final docDate = DateTime.tryParse(doc.date);
       final formattedDate = docDate != null ? _dateFormat.format(docDate) : doc.date;
-      final type = doc.type.toString().split('.').last;
+      final type = doc.type;
       
-      buffer.writeln('${_padString(doc.id, 8)} ${_padString(type, 12)} ${_padString(formattedDate, 12)} ${_padString(doc.status, 12)}');
+      buffer.writeln('${_padString(doc.id?.toString() ?? 'N/A', 8)} ${_padString(type, 12)} ${_padString(formattedDate, 12)} ${_padString(doc.status, 12)}');
     }
 
     buffer.writeln('-'.padLeft(80, '-'));
@@ -121,7 +121,7 @@ class SimpleReportService {
 
   /// Gera relatório financeiro simples como texto
   static Future<String> generateFinancialReport({
-    required List<Document> documents,
+    required List<DocumentModel> documents,
     required Store store,
     required DateTime startDate,
     required DateTime endDate,
@@ -149,7 +149,7 @@ class SimpleReportService {
       // For now, we'll use a placeholder calculation
       const estimatedValue = 1000.0; // Placeholder
       
-      if (doc.type == DocumentType.entrada) {
+      if (doc.type == 'entrada') {
         totalEntradas += estimatedValue;
         entradaCount++;
       } else {
@@ -185,7 +185,7 @@ class SimpleReportService {
         
         monthlyData[monthKey]!['count'] = monthlyData[monthKey]!['count'] + 1;
         
-        if (doc.type == DocumentType.entrada) {
+        if (doc.type == 'entrada') {
           monthlyData[monthKey]!['entradas'] = monthlyData[monthKey]!['entradas'] + 1000.0;
         } else {
           monthlyData[monthKey]!['saidas'] = monthlyData[monthKey]!['saidas'] + 1000.0;

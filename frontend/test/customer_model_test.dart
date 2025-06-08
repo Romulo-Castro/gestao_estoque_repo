@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frontend/models/customer_model.dart';
+import 'package:frontend/core/data/models/customer_model.dart';
 
 void main() {
   group('Customer Model Tests', () {

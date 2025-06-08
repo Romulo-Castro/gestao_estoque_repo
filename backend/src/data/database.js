@@ -173,6 +173,15 @@ function parseItemProperties(item) {
 const findUserByEmail = (email) => getQuery('SELECT * FROM users WHERE email = ?', [email]);
 const createUser = ({ name, email, passwordHash }) => runQuery('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)', [name, email, passwordHash]);
 const findUserById = (id) => getQuery('SELECT id, name, email, createdAt, updatedAt FROM users WHERE id = ?', [id]);
+const findUserByIdWithPassword = (id) => getQuery('SELECT * FROM users WHERE id = ?', [id]);
+const updateUserProfile = (userId, { name, email, passwordHash }) => {
+    if (passwordHash) {
+        return runQuery('UPDATE users SET name = ?, email = ?, password_hash = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [name, email, passwordHash, userId]);
+    } else {
+        return runQuery('UPDATE users SET name = ?, email = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [name, email, userId]);
+    }
+};
+const updateUserPassword = (userId, passwordHash) => runQuery('UPDATE users SET password_hash = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [passwordHash, userId]);
 
 // -- Stores --
 const createStoreDB = ({ name, address }) => runQuery('INSERT INTO stores (name, address) VALUES (?, ?)', [name, address]);
@@ -304,12 +313,13 @@ module.exports = {
     createTables,
     runQuery, // Exportar auxiliares pode ser útil para testes ou scripts
     getQuery,
-    allQuery,
-
-    // Users
+    allQuery,    // Users
     findUserByEmail,
     createUser,
     findUserById,
+    findUserByIdWithPassword,
+    updateUserProfile,
+    updateUserPassword,
 
     // Stores
     createStoreDB,

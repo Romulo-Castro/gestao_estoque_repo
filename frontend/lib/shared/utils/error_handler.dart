@@ -216,38 +216,35 @@ class ErrorHandler {
 
 /// Mixin for providers to standardize error handling
 mixin ErrorHandlingMixin on ChangeNotifier {
-  String? _error;
   bool _isLoading = false;
+  String? _error;
+  StackTrace? _stackTrace;
 
-  String? get error => _error;
   bool get isLoading => _isLoading;
+  String? get error => _error;
+  StackTrace? get stackTrace => _stackTrace;
   bool get hasError => _error != null;
 
   /// Set loading state and clear errors
-  void setLoading(bool loading) {
-    if (_isLoading == loading) return;
-    _isLoading = loading;
-    if (loading) _error = null;
-    notifyListeners();
+  void setLoading(bool value) {
+    if (_isLoading == value) return;
+    _isLoading = value;
+    Future.microtask(notifyListeners);
   }
 
   /// Set error state and stop loading
-  void setError(dynamic error, [String? operation]) {
-    _error = ErrorHandler.handleError(error);
-    _isLoading = false;
-    notifyListeners();
-    
-    if (operation != null) {
-      ErrorHandler.logError(operation, error);
-    }
+  void setError(String? message, String? operation, {StackTrace? stackTrace}) {
+    _error = message != null ? '$operation: $message' : null;
+    _stackTrace = stackTrace;
+    Future.microtask(notifyListeners);
   }
 
   /// Clear error state
   void clearError() {
-    if (_error != null) {
-      _error = null;
-      notifyListeners();
-    }
+    if (_error == null && _stackTrace == null) return;
+    _error = null;
+    _stackTrace = null;
+    Future.microtask(notifyListeners);
   }
 
   /// Wrapper for async operations with error handling
@@ -256,13 +253,18 @@ mixin ErrorHandlingMixin on ChangeNotifier {
     String operationName,
   ) async {
     setLoading(true);
+    // No need to clearError() here if setError(null, ...) handles it
+    // clearError(); // setError(null, ...) will clear it if operation is successful
+
     try {
       final result = await operation();
+      setError(null, null); // Clear error on success
       setLoading(false);
       return result;
-    } catch (error, stackTrace) {
-      setError(error, operationName);
-      ErrorHandler.logError(operationName, error, stackTrace);
+    } catch (e, s) {
+      debugPrint("Error in $operationName: $e\n$s");
+      setError(ErrorHandler.handleError(e), operationName, stackTrace: s);
+      setLoading(false);
       return null;
     }
   }

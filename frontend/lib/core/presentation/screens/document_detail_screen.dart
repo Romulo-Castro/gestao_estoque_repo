@@ -31,32 +31,37 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
   }
 
   Future<void> _loadDocument() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    // Use addPostFrameCallback to ensure setState is not called during build
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
 
-    try {
-      final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
-      if (storeId == null) {
-        throw Exception("Nenhuma loja selecionada");
-      }      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
-      final document = await docProvider.fetchDocumentById(widget.documentId);
-      
-      if (mounted) {
-        setState(() {
-          _document = document;
-          _isLoading = false;
-        });
+      try {
+        final storeId = Provider.of<StoreProvider>(context, listen: false).selectedStoreId;
+        if (storeId == null) {
+          throw Exception("Nenhuma loja selecionada");
+        }
+        final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+        final document = await docProvider.fetchDocumentById(widget.documentId);
+        
+        if (mounted) {
+          setState(() {
+            _document = document;
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _error = e.toString();
+            _isLoading = false;
+          });
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
-    }
+    });
   }
 
   String _getStatusText(String? status) {
@@ -223,17 +228,17 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
             separatorBuilder: (context, index) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final item = _document!.items[index];
-              final lineTotal = item.totalValue;
+              final lineTotal = item.quantity * item.unitValue;
               
               return ListTile(
                 title: Text(
-                  item.description.isNotEmpty ? item.description : 'Item ${item.id}',
+                  item.description.isNotEmpty ? item.description : 'Item ${item.id ?? 'N/A'}',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Qtd: ${item.quantity.toString()}"),
+                    Text("Qtd: ${item.quantity.toStringAsFixed(2)}"),
                     Text("Preço unit.: R\$ ${item.unitValue.toStringAsFixed(2)}"),
                   ],
                 ),
@@ -291,9 +296,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
       case 'entrada':
         return 'Entrada';
       case 'saida':
-      case 'saída':
         return 'Saída';
-      case 'unknown':
       default:
         return 'Desconhecido';
     }
