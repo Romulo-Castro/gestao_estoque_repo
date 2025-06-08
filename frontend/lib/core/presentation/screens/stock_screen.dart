@@ -29,6 +29,11 @@ class _StockScreenState extends State<StockScreen> {
   int? _currentStoreId;
   int _quantityDecimals = 0;
 
+  // Search state
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _isSearching = false;
+
   final ApiService _apiService = ApiService();
   StoreProvider? _storeProviderRef; // Referência para usar no dispose
 
@@ -62,6 +67,7 @@ class _StockScreenState extends State<StockScreen> {
   void dispose() {
     // Remove o listener usando a referência guardada
     _storeProviderRef?.removeListener(_storeChangeListener);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -248,24 +254,24 @@ class _StockScreenState extends State<StockScreen> {
   }
 
   // Constrói a view baseada no tipo de layout selecionado
-  Widget _buildLayoutBasedView(int currentStoreId, LayoutType layoutType) {
+  Widget _buildLayoutBasedView(int currentStoreId, LayoutType layoutType, List<StockItem> items) {
     switch (layoutType) {
       case LayoutType.list:
-        return _buildListView(currentStoreId);
+        return _buildListView(currentStoreId, items);
       case LayoutType.grid:
-        return _buildGridView(currentStoreId);
+        return _buildGridView(currentStoreId, items);
       case LayoutType.card:
-        return _buildCardView(currentStoreId);
+        return _buildCardView(currentStoreId, items);
     }
   }
 
   // Constrói uma visualização em cards (mais detalhada que grid)
-  Widget _buildCardView(int currentStoreId) {
+  Widget _buildCardView(int currentStoreId, List<StockItem> items) {
     return ListView.builder(
       padding: const EdgeInsets.all(8.0),
-      itemCount: _stockItems.length,
+      itemCount: items.length,
       itemBuilder: (context, index) {
-        final item = _stockItems[index];
+        final item = items[index];
         final imageUrl = item.imageUrl;
         final bool hasImage = imageUrl != null && imageUrl.isNotEmpty;
         
@@ -398,6 +404,33 @@ class _StockScreenState extends State<StockScreen> {
     return quantity.toStringAsFixed(_quantityDecimals);
   }
 
+  // Search helpers
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchController.clear();
+        _searchQuery = '';
+      }
+    });
+  }
+
+  void _updateSearchQuery(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+  }
+
+  List<StockItem> _getFilteredItems() {
+    if (_searchQuery.isEmpty) return _stockItems;
+    final searchLower = _searchQuery.toLowerCase();
+    return _stockItems.where((item) {
+      final barcode = item.properties['barcode']?.toString().toLowerCase() ?? '';
+      return item.name.toLowerCase().contains(searchLower) ||
+          barcode.contains(searchLower);
+    }).toList();
+  }
+
   // --- Build Method ---
   @override
   Widget build(BuildContext context) {
@@ -412,8 +445,26 @@ class _StockScreenState extends State<StockScreen> {
     return Scaffold(
       drawer: const AppDrawer(),
       appBar: AppBar(
-        title: Text(selectedStore?.name ?? 'Nenhuma Loja'),
-        actions: [ /* ... Ações como antes (já usam _isLoading) ... */
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                onChanged: _updateSearchQuery,
+                decoration: const InputDecoration(
+                  hintText: 'Pesquisar itens...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.white70),
+                ),
+                style: const TextStyle(color: Colors.white),
+                autofocus: true,
+              )
+            : Text(selectedStore?.name ?? 'Nenhuma Loja'),
+        actions: [
+          IconButton(
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            tooltip: _isSearching ? 'Fechar busca' : 'Buscar',
+            onPressed: _toggleSearch,
+          ),
+          /* ... Ações como antes (já usam _isLoading) ... */
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             tooltip: 'Mais opções',
@@ -520,21 +571,40 @@ class _StockScreenState extends State<StockScreen> {
     if (selectedStore == null) { return const Center(child: Padding( padding: EdgeInsets.all(20.0), child: Text( 'Selecione uma loja no menu lateral para visualizar o estoque ou crie uma nova em "Gerenciar Lojas".', textAlign: TextAlign.center, ),)); }
     if (_isLoading && _stockItems.isEmpty) { return const Center(child: CircularProgressIndicator()); }
     if (_errorMessage != null) { return Center( child: Padding( padding: const EdgeInsets.all(16.0), child: Column( mainAxisSize: MainAxisSize.min, children: [ const Icon(Icons.error_outline, color: Colors.red, size: 48), const SizedBox(height: 16), Text('Erro ao carregar dados:', style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 8), Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: Colors.red[700])), const SizedBox(height: 20), ElevatedButton.icon( icon: const Icon(Icons.refresh), label: const Text('Tentar Novamente'), onPressed: () => _loadStockItems(storeId: selectedStore.id), ) ]))); }
-    if (_stockItems.isEmpty) { return Center( child: Text( 'Nenhum item cadastrado nesta loja (${selectedStore.name}).\nUse o botão "+" para adicionar.', textAlign: TextAlign.center, )); }
+    if (_stockItems.isEmpty) {
+      return Center(
+        child: Text(
+          'Nenhum item cadastrado nesta loja (${selectedStore.name}).\nUse o botão "+" para adicionar.',
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    final itemsToShow = _getFilteredItems();
+    if (itemsToShow.isEmpty) {
+      return Center(
+        child: Text(
+          _searchQuery.isEmpty
+              ? 'Nenhum item disponível.'
+              : 'Nenhum item corresponde à pesquisa.',
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
 
     // Lista ou Grid baseado no LayoutProvider
     return RefreshIndicator(
       onRefresh: () => _loadStockItems(storeId: selectedStore.id, showLoading: false),
-      child: _buildLayoutBasedView(selectedStore.id, layoutProvider.stockLayoutType),
+      child: _buildLayoutBasedView(selectedStore.id, layoutProvider.stockLayoutType, itemsToShow),
     );
   }
 
   // Constrói ListView (com correção no CircleAvatar)
-  Widget _buildListView(int currentStoreId) {
+  Widget _buildListView(int currentStoreId, List<StockItem> items) {
     return ListView.builder(
-      itemCount: _stockItems.length,
+      itemCount: items.length,
       itemBuilder: (context, index) {
-        final item = _stockItems[index];
+        final item = items[index];
         final imageUrl = item.imageUrl;
         final bool hasImage = imageUrl != null && imageUrl.isNotEmpty;
         // Log para verificar properties
@@ -557,7 +627,7 @@ class _StockScreenState extends State<StockScreen> {
   }
 
   // Constrói GridView (com correção na imagem)
-  Widget _buildGridView(int currentStoreId) {
+  Widget _buildGridView(int currentStoreId, List<StockItem> items) {
     double screenWidth = MediaQuery.of(context).size.width;
     int crossAxisCount = (screenWidth / 180).floor();
     crossAxisCount = crossAxisCount < 2 ? 2 : crossAxisCount;
@@ -567,9 +637,9 @@ class _StockScreenState extends State<StockScreen> {
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount, crossAxisSpacing: 8.0, mainAxisSpacing: 8.0, childAspectRatio: 0.8,
       ),
-      itemCount: _stockItems.length,
+      itemCount: items.length,
       itemBuilder: (context, index) {
-        final item = _stockItems[index];
+        final item = items[index];
         final imageUrl = item.imageUrl;
         final bool hasImage = imageUrl != null && imageUrl.isNotEmpty;
         // Log para verificar properties
