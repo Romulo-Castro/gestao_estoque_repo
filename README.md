@@ -49,6 +49,12 @@ Sistema completo de gestão de estoques com arquitetura cliente-servidor e recur
 
 ## Configuração Rápida
 
+Execute o script a seguir para configurar dependências automaticamente:
+
+```bash
+bash scripts/setup_environment.sh
+```
+
 ### Backend
 ```powershell
 cd backend
