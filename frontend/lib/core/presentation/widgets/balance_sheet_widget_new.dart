@@ -7,16 +7,15 @@ import 'package:intl/intl.dart';
 // Added/Corrected imports:
 import '../../data/models/document_model.dart';
 import '../../domain/entities/document_entity.dart'; // For DocumentType enum
+import '../../../shared/services/logger_service.dart';
 
 // Helper function to parse date strings safely
 DateTime? _parseDate(String? dateStr) {
   if (dateStr == null || dateStr.isEmpty) {
-    return null;
-  }
-  try {
+    return null;  }  try {
     return DateTime.parse(dateStr);
   } catch (e) {
-    print('Error parsing date string: $dateStr - $e'); // Optional: for debugging
+    LoggerService.warning('Error parsing date string: $dateStr', error: e, tag: 'BalanceSheet');
     return null;
   }
 }

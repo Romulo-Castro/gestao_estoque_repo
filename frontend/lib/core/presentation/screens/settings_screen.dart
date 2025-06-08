@@ -6,6 +6,8 @@ import '../../data/models/user_model.dart'; // Added import for User model
 import '../providers/store_provider.dart';
 import '../providers/layout_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/user_profile_provider.dart'; // Added import for UserProfileProvider
+import '../../data/datasources/api_service.dart'; // Added import for ApiService
 import '../../../shared/utils/app_prefs.dart';
 import '../widgets/app_drawer.dart';
 
@@ -182,32 +184,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isLoading = true;
       });
       try {
-        // The backend API for profile update (name, email, password) needs to be called here.
-        // The current AuthProvider.updateUserProfile(User updatedUser) only updates the local state
-        // and does not handle password changes or make an API call for profile updates with passwords.
-        // This is a limitation of the current AuthProvider implementation.
-
-        // For now, we update the local user object with name and email.
-        final updatedUser = User(
-          id: currentUser.id, // Use existing user's ID
+        // Use the proper UserProfileProvider for complete profile update including password
+        final userProfileProvider = UserProfileProvider(ApiService(), authProvider);
+        
+        final success = await userProfileProvider.updateProfile(
           name: result['name']!,
           email: result['email']!,
+          currentPassword: result['currentPassword'],
+          newPassword: result['newPassword'],
         );
-        await authProvider.updateUserProfile(updatedUser);
 
-        // TODO: Implement actual API call for profile update including password change.
-        // This would likely involve a new method in AuthProvider and ApiService, e.g.:
-        // await authProvider.updateProfileOnServer(
-        //   name: result['name']!,
-        //   email: result['email']!,
-        //   currentPassword: result['currentPassword'], // Ensure these keys exist in result
-        //   newPassword: result['newPassword'],         // Ensure these keys exist in result
-        // );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Perfil (localmente) atualizado com sucesso! Senha não alterada no servidor.')),
-          );
+        if (success) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Perfil atualizado com sucesso!')),
+            );
+          }
+        } else {
+          throw Exception('Falha ao atualizar perfil no servidor');
         }
       } catch (e) {
         if (mounted) {

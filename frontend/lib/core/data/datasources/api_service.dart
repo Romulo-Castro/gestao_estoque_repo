@@ -11,6 +11,7 @@ import '../models/store_model.dart';
 import '../models/customer_model.dart';
 import '../models/item_group_model.dart';
 import '../models/supplier_model.dart';
+import '../../../shared/services/logger_service.dart';
 
 class ApiService {
   // ATENÇÃO: Ajuste o IP se necessário.
@@ -22,12 +23,12 @@ class ApiService {
   String? _authToken;
 
   ApiService() {
-    // print("ApiService: Instanciado com baseUrl: $baseUrl");
+    LoggerService.debug("ApiService: Instanciado com baseUrl: $baseUrl");
   }
 
   void updateAuthToken(String? token) {
     _authToken = token;
-    // print("ApiService: Auth token atualizado para: ${_authToken == null ? 'null' : 'presente'}");
+    LoggerService.debug("ApiService: Auth token atualizado para: ${_authToken == null ? 'null' : 'presente'}");
   }
 
   // Alias for backward compatibility

@@ -1,10 +1,16 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/foundation.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
   static Future<void> initialize() async {
+    // Skip initialization on web platform
+    if (kIsWeb) {
+      return;
+    }
+    
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings();
     const settings = InitializationSettings(android: androidSettings, iOS: iosSettings);
@@ -16,6 +22,11 @@ class NotificationService {
     required String title,
     required String body,
   }) async {
+    // Skip notifications on web platform
+    if (kIsWeb) {
+      return;
+    }
+    
     const androidDetails = AndroidNotificationDetails(
       'default_channel',
       'Notificacoes',

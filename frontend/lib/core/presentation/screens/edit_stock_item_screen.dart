@@ -8,6 +8,7 @@ import "../../data/models/stock_item.dart";
 import "../../data/models/item_group_model.dart"; // Importar modelo de grupo
 import "../providers/auth_provider.dart";
 import "../providers/item_group_provider.dart"; // Importar provider de grupo
+import "../providers/store_provider.dart"; // Importar provider de loja
 // Para obter storeId
 import "../../data/datasources/api_service.dart";
 import "../../../shared/utils/app_prefs.dart";
@@ -648,6 +649,70 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
     );
   }
 
+  void _showGroupSelectionDialog() {
+    final itemGroupProvider = Provider.of<ItemGroupProvider>(context, listen: false);
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Selecionar Grupo'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: itemGroupProvider.groups.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text('Nenhum grupo disponível.'),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: itemGroupProvider.groups.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return ListTile(
+                          title: const Text('Sem grupo'),
+                          onTap: () {
+                            setState(() {
+                              _selectedItemGroup = null;
+                            });
+                            Navigator.of(context).pop();
+                          },
+                          trailing: _selectedItemGroup == null 
+                              ? const Icon(Icons.check, color: Colors.green)
+                              : null,
+                        );
+                      }
+                      
+                      final group = itemGroupProvider.groups[index - 1];
+                      return ListTile(
+                        title: Text(group.name),
+                        subtitle: group.description?.isNotEmpty == true 
+                            ? Text(group.description!)
+                            : null,
+                        onTap: () {
+                          setState(() {
+                            _selectedItemGroup = group;
+                          });
+                          Navigator.of(context).pop();
+                        },
+                        trailing: _selectedItemGroup?.id == group.id
+                            ? const Icon(Icons.check, color: Colors.green)
+                            : null,
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Fechar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final itemGroupProvider = context.watch<ItemGroupProvider>();
@@ -710,8 +775,7 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
             icon: const Icon(Icons.label_outline), // Etiqueta (categorias)
             tooltip: 'Categorias/Grupos',
             onPressed: () {
-              // TODO: Implementar navegação ou diálogo para categorias/grupos
-              _showInfoSnackbar('Funcionalidade de grupos/categorias a ser implementada.');
+              _showGroupSelectionDialog();
             },
           ),
           IconButton(
@@ -746,26 +810,48 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  // Seletor de Loja (Placeholder - funcionalidade a ser definida)
+                  // Seletor de Loja
                   Container(
                     padding: const EdgeInsets.symmetric(vertical: 8.0),
                     alignment: Alignment.center,
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: "all_stores", // Placeholder value
-                        isDense: true,
-                        items: const [
-                          DropdownMenuItem(
-                            value: "all_stores",
-                            child: const Text("– Todas as Lojas –"), // Added const
+                    child: Consumer<StoreProvider>(
+                      builder: (context, storeProvider, child) {
+                        final stores = storeProvider.stores;
+                        final selectedStore = storeProvider.selectedStore;
+                        
+                        if (stores.isEmpty) {
+                          return const Text(
+                            "Nenhuma loja disponível",
+                            style: TextStyle(color: Colors.grey),
+                          );
+                        }
+                        
+                        return DropdownButtonHideUnderline(
+                          child: DropdownButton<int?>(
+                            value: selectedStore?.id,
+                            isDense: true,
+                            hint: const Text("Selecione uma loja"),
+                            items: [
+                              const DropdownMenuItem(
+                                value: null,
+                                child: Text("– Todas as Lojas –"),
+                              ),
+                              ...stores.map((store) => DropdownMenuItem(
+                                value: store.id,
+                                child: Text(store.name),
+                              )),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) {
+                                storeProvider.selectAllStores();
+                              } else {
+                                final store = stores.firstWhere((s) => s.id == value);
+                                storeProvider.selectStore(store);
+                              }
+                            },
                           ),
-                          // TODO: Popular com lojas reais se necessário
-                        ],
-                        onChanged: (value) {
-                          // TODO: Implementar lógica de seleção de loja
-                          _showInfoSnackbar('Seleção de loja a ser implementada.');
-                        },
-                      ),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 16),

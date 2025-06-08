@@ -85,8 +85,13 @@ void main() async {
   // antes de `runApp` se você usar `await` antes dele (como fizemos em AppPrefs).
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializa o serviço de notificações locais
-  await NotificationService.initialize();
+  // Inicializa o serviço de notificações locais (apenas em plataformas móveis)
+  try {
+    await NotificationService.initialize();
+  } catch (e) {
+    // Ignora erros de inicialização em plataformas não suportadas (como web)
+    print('Notification service initialization failed (likely web platform): $e');
+  }
 
   // Initialize Clean Architecture dependencies
   await initializeDependencies();

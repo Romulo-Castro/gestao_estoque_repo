@@ -19,10 +19,17 @@ router.put("/:documentId", validateIdParam('documentId'), validateDocumentHeader
 // DELETE - Cancelar documento (reverte estoque)
 router.delete("/:documentId", validateIdParam('documentId'), handleValidationErrors, documentController.cancelDocument);
 
-// TODO: Rotas específicas para itens de documento? Geralmente não são necessárias,
-// pois os itens são gerenciados junto com o documento principal.
-// Ex: POST /:documentId/items - Adicionar item (complexo, geralmente feito na criação)
-// Ex: DELETE /:documentId/items/:itemId - Remover item (complexo, geralmente não permitido após criação)
+/**
+ * Note: Individual document item routes are intentionally not implemented.
+ * Document items are managed as part of the main document operations for data consistency:
+ * - Items are created/updated during document creation/update
+ * - Individual item modifications could break document integrity
+ * - Stock movements are tied to complete document operations
+ * 
+ * If needed in the future, consider:
+ * - POST /:documentId/items - Add item (requires recalculating totals)
+ * - DELETE /:documentId/items/:itemId - Remove item (requires stock adjustment)
+ */
 
 module.exports = router;
 
