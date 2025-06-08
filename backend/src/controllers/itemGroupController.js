@@ -41,7 +41,13 @@ exports.createGroup = catchAsync(async (req, res, next) => {
         throw new AppError('Nome do grupo é obrigatório.', 400);
     }
 
-    // TODO: Validar se parent_group_id (se fornecido) pertence à mesma storeId?
+    if (parent_group_id) {
+        const parentId = parseInt(parent_group_id, 10);
+        const parentGroup = await db.findGroupByIdAndStore(parentId, storeId);
+        if (!parentGroup) {
+            throw new AppError('Grupo pai não encontrado nesta loja.', 400);
+        }
+    }
 
     const result = await db.createGroupInStore({
         storeId,
@@ -67,7 +73,28 @@ exports.updateGroup = catchAsync(async (req, res, next) => {
         throw new AppError('Nome do grupo é obrigatório.', 400);
     }
     
-    // TODO: Validar se parent_group_id (se fornecido) pertence à mesma storeId e não cria ciclo?
+    if (parent_group_id) {
+        const parentId = parseInt(parent_group_id, 10);
+        const parentGroup = await db.findGroupByIdAndStore(parentId, storeId);
+        if (!parentGroup) {
+            throw new AppError('Grupo pai não encontrado nesta loja.', 400);
+        }
+
+        if (parentId === groupId) {
+            throw new AppError('Grupo pai não pode ser o próprio grupo.', 400);
+        }
+
+        // Verificar se o novo grupo pai é descendente do grupo atual para evitar ciclos
+        let currentParent = parentGroup.parent_group_id;
+        while (currentParent) {
+            if (currentParent === groupId) {
+                throw new AppError('Ciclo de grupos detectado.', 400);
+            }
+            const nextParent = await db.findGroupByIdAndStore(currentParent, storeId);
+            if (!nextParent) break;
+            currentParent = nextParent.parent_group_id;
+        }
+    }
 
     const existingGroup = await db.findGroupByIdAndStore(groupId, storeId);
     if (!existingGroup) {

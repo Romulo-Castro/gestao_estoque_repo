@@ -14,8 +14,19 @@ const {
 exports.getAllDocuments = catchAsync(async (req, res, next) => {
     const storeId = validateId(req.params.storeId, 'ID da loja');
     
-    // TODO: Adicionar filtros (tipo, data, cliente/fornecedor) via query params
-    const documents = await db.findDocumentsByStore(storeId);
+    const { type, startDate, endDate, customerId, supplierId } = req.query;
+    const filters = {
+        type,
+        startDate,
+        endDate,
+        customerId: customerId ? parseInt(customerId, 10) : undefined,
+        supplierId: supplierId ? parseInt(supplierId, 10) : undefined,
+    };
+
+    const hasFilters = Object.values(filters).some(v => v !== undefined && v !== '' && v !== null);
+    const documents = hasFilters
+        ? await db.findDocumentsByStoreFiltered(storeId, filters)
+        : await db.findDocumentsByStore(storeId);
     sendSuccessResponse(res, documents, 'Documentos carregados com sucesso');
 });
 
@@ -51,7 +62,18 @@ exports.createDocument = catchAsync(async (req, res, next) => {
         throw new AppError('Documento deve ter pelo menos um item.', 400);
     }
 
-    // TODO: Validar se customerId/supplierId existem na loja, se fornecidos
+    if (customerId) {
+        const customer = await db.findCustomerByIdAndStore(customerId, storeId);
+        if (!customer) {
+            throw new AppError(`Cliente com ID ${customerId} não encontrado na loja.`, 400);
+        }
+    }
+    if (supplierId) {
+        const supplier = await db.findSupplierByIdAndStore(supplierId, storeId);
+        if (!supplier) {
+            throw new AppError(`Fornecedor com ID ${supplierId} não encontrado na loja.`, 400);
+        }
+    }
 
     try {
         await db.beginTransaction();
@@ -125,7 +147,9 @@ exports.updateDocumentHeader = catchAsync(async (req, res, next) => {
         return notFound('Documento nesta loja');
     }
     
-    // TODO: Adicionar lógica para impedir edição se o documento estiver "fechado" ou "processado"
+    if (existingDoc.status && ['FECHADO', 'PROCESSADO', 'CANCELADO'].includes(existingDoc.status)) {
+        throw new AppError('Documento não pode ser editado no estado atual.', 400);
+    }
 
     const result = await db.updateDocumentHeaderDetails(documentId, storeId, {
         date: document_date || date || existingDoc.document_date, // Manter data se não fornecida
