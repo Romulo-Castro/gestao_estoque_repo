@@ -226,6 +226,34 @@ const deleteSupplierFromStore = (supplierId, storeId) => runQuery('DELETE FROM s
 
 // -- Documents --
 const findDocumentsByStore = (storeId) => allQuery('SELECT * FROM documents WHERE store_id = ? ORDER BY document_date DESC', [storeId]);
+const findDocumentsByStoreFiltered = (storeId, { type, startDate, endDate, customerId, supplierId }) => {
+    let sql = 'SELECT * FROM documents WHERE store_id = ?';
+    const params = [storeId];
+
+    if (type) {
+        sql += ' AND type = ?';
+        params.push(type);
+    }
+    if (customerId) {
+        sql += ' AND customer_id = ?';
+        params.push(customerId);
+    }
+    if (supplierId) {
+        sql += ' AND supplier_id = ?';
+        params.push(supplierId);
+    }
+    if (startDate) {
+        sql += ' AND document_date >= ?';
+        params.push(startDate);
+    }
+    if (endDate) {
+        sql += ' AND document_date <= ?';
+        params.push(endDate);
+    }
+
+    sql += ' ORDER BY document_date DESC';
+    return allQuery(sql, params);
+};
 const findDocumentByIdAndStore = (documentId, storeId) => getQuery('SELECT * FROM documents WHERE id = ? AND store_id = ?', [documentId, storeId]);
 const findDocumentItemsByDocumentId = (documentId) => allQuery('SELECT di.*, si.name as item_name FROM document_items di JOIN stock_items si ON di.item_id = si.id WHERE di.document_id = ?', [documentId]);
 const createDocumentHeader = ({ storeId, type, date, customerId, supplierId, notes, totalAmount }) => 
@@ -357,6 +385,7 @@ module.exports = {
     // Documents & Stock Adjustment
     createDocumentAndAdjustStock,
     findDocumentsByStore,
+    findDocumentsByStoreFiltered,
     findDocumentByIdAndStore,
     findDocumentItemsByDocumentId,
     createDocumentHeader,
