@@ -229,6 +229,16 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
     return true;
   }
 
+  /// Safely navigate back without interfering with build cycles
+  void _safeNavigateBack() {
+    // Use microtask to defer navigation until after the current build cycle
+    Future.microtask(() {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
@@ -503,13 +513,11 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
         }
       }
 
-      final StockItem resultItemToReturn = currentSavedItem.copyWith(imageUrl: finalImageUrl);
-
       if (mounted) {
         if (imageOperationAttempted) {
             await Future.delayed(Duration(milliseconds: (_selectedImageFile == null && finalImageUrl == null) ? 500 : 1500));
         }
-        Navigator.pop(context, resultItemToReturn); 
+        Navigator.pop(context, true); 
       }
 
     } catch (e) {
@@ -763,10 +771,7 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             if (_isLoading) return; // Prevent pop if loading
-            // Use a safe navigation method that doesn't interfere with build cycles
-            if (Navigator.canPop(context)) {
-              Navigator.of(context).pop();
-            }
+            _safeNavigateBack();
           },
         ),
         title: Text(_isEditing ? "Editar Item" : "Adicionar Item"),

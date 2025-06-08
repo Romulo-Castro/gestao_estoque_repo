@@ -64,13 +64,11 @@ class GetStockItems {
             groupName: stockItem.groupName,
             groupDescription: stockItem.groupDescription
         };
-    }
-
-    buildImageUrl(filename) {
+    }    buildImageUrl(filename) {
         if (!filename) return null;
-        const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
-        const uploadDir = process.env.UPLOAD_FOLDER || 'uploads';
-        return `${baseUrl}/${uploadDir}/${filename}`;
+        // Import PlatformUrlService for URL building
+        const PlatformUrlService = require('../../../../shared/services/platform-url-service');
+        return PlatformUrlService.buildImageUrl(filename);
     }
 }
 

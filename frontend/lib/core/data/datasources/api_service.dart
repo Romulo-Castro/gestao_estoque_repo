@@ -12,18 +12,17 @@ import '../models/customer_model.dart';
 import '../models/item_group_model.dart';
 import '../models/supplier_model.dart';
 import '../../../shared/services/logger_service.dart';
+import '../../../shared/services/platform_config_service.dart';
 
 class ApiService {
-  // ATENÇÃO: Ajuste o IP se necessário.
-  // 10.0.2.2 é para emulador Android se o backend estiver no localhost da máquina host.
-  // Se o backend e o app Flutter estiverem rodando na mesma máquina (ex: Flutter Web ou Desktop), use localhost.
-  // Se o app estiver em um dispositivo físico, use o IP da sua máquina na rede local.
-  static const String baseUrl = 'http://10.0.2.2:3000/api';
-  // static const String baseUrl = 'http://localhost:3000/api'; // Para iOS ou web/desktop
+  // Use platform-aware configuration for base URL
+  static String get baseUrl => PlatformConfigService.getBaseUrl();
+  
   String? _authToken;
 
   ApiService() {
     LoggerService.debug("ApiService: Instanciado com baseUrl: $baseUrl");
+    LoggerService.info("Platform Config: ${PlatformConfigService.getConfigInfo()}");
   }
 
   void updateAuthToken(String? token) {
