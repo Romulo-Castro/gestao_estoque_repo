@@ -180,26 +180,27 @@ class DocumentItemModel {
   }) : totalValue = totalValue ?? (quantity * unitValue);
 
   factory DocumentItemModel.fromJson(Map<String, dynamic> json) {
-    final quantity = (json['quantity'] ?? 0).toDouble();
-    final unitValue = (json['unit_value'] ?? 0.0).toDouble();
+    final double quantity = (json['quantity'] is num ? json['quantity'] : 0).toDouble();
+    final double unitValue = (json['unit_price'] ?? json['unitPrice'] ?? 0).toDouble();
+    final double totalValue = (json['total_price'] ?? json['totalPrice'] ?? (quantity * unitValue)).toDouble();
     
     return DocumentItemModel(
       id: json['id'],
       quantity: quantity,
       unitValue: unitValue,
-      totalValue: (json['total_value'] ?? (quantity * unitValue)).toDouble(),
+      totalValue: totalValue,
       description: json['description'] ?? '',
-      stockItemId: json['stock_item_id'] ?? json['itemId'], // Also check for 'itemId'
+      stockItemId: json['stock_item_id'] ?? json['itemId'],
       stockItemName: json['stock_item_name'] ?? json['name'] ?? '',
     );
   }
   Map<String, dynamic> toJson() {
     return {
       if (id != null) 'id': id,
-      'itemId': stockItemId, // Map stockItemId to itemId for backend compatibility
+      'stock_item_id': stockItemId, // Changed from 'itemId' to 'stock_item_id'
       'quantity': quantity,
-      'unit_value': unitValue,
-      'total_value': totalValue,
+      'unit_price': unitValue,
+      'total_price': totalValue,
       'description': description,
     };
   }

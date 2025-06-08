@@ -826,7 +826,7 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
-              onPressed: _addItem,
+              onPressed: () => _updateItemInList(index),
               child: const Text('Adicionar'),
             ),
           ],
@@ -889,9 +889,17 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
   }
 
   String _calculateItemTotal() {
-    final quantity = double.tryParse(_quantityController.text) ?? 0;
-    final price = double.tryParse(_priceController.text) ?? 0;
-    return (quantity * price).toStringAsFixed(2);
+    final quantityText = _quantityController.text;
+    final priceText = _priceController.text;
+
+    // Allow comma or dot as decimal separator for parsing quantity, default to 0 if not parseable
+    final quantity = double.tryParse(quantityText.replaceAll(',', '.')) ?? 0.0;
+    // Allow comma or dot as decimal separator for parsing price, default to 0 if not parseable
+    final price = double.tryParse(priceText.replaceAll(',', '.')) ?? 0.0;
+    
+    final total = quantity * price;
+    // Format with comma for display
+    return total.toStringAsFixed(2).replaceAll('.', ',');
   }
 
   void _addItem() {
@@ -916,13 +924,55 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
     }
   }
 
+  void _updateItemInList(int index) {
+    if (_addItemFormKey.currentState?.validate() ?? false) {
+      final quantity = double.parse(_quantityController.text);
+      final unitValue = double.parse(_priceController.text);
+      final originalItem = _items[index]; // Get the original item
+
+      int? newStockItemId;
+      String newStockItemName;
+
+      if (_selectedStockItem != null) {
+        // A stock item is selected in the dialog (either pre-filled and kept, or newly selected)
+        newStockItemId = _selectedStockItem!.id;
+        newStockItemName = _selectedStockItem!.name;
+      } else {
+        // No stock item is selected in the dialog.
+        // This means the dropdown was blank (either original item had no stock_item_id,
+        // or its stock_item_id didn't match any available stock items from the provider)
+        // AND the user did not pick a new stock item.
+        // In this case, preserve the original stock item details.
+        newStockItemId = originalItem.stockItemId;
+        newStockItemName = originalItem.stockItemName;
+      }
+
+      final updatedItem = DocumentItemModel(
+        id: originalItem.id, // Preserve original item ID if it exists
+        quantity: quantity,
+        unitValue: unitValue,
+        stockItemId: newStockItemId,
+        stockItemName: newStockItemName,
+        description: originalItem.description, // Preserve original description for now
+      );
+
+      setState(() {
+        _items[index] = updatedItem;
+      });
+
+      Navigator.of(context).pop();
+      _showSnackBar('Item atualizado com sucesso!');
+    }
+  }
+
   void _editItem(int index) {
     final item = _items[index];
-    _selectedStockItem = null; // Will be set if we can find the stock item
-    _quantityController.text = item.quantity.toString();
-    _priceController.text = item.unitValue.toStringAsFixed(2);
-    
-    // Try to find the stock item
+    _selectedStockItem = null; 
+    // Quantity is likely integer, ensure it's displayed as such.
+    _quantityController.text = item.quantity.toInt().toString(); 
+    // Price should be formatted with comma for display consistency.
+    _priceController.text = item.unitValue.toStringAsFixed(2).replaceAll('.', ',');
+
     final stockProvider = Provider.of<StockProvider>(context, listen: false);
     if (item.stockItemId != null) {
       try {
@@ -930,7 +980,7 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
           (stockItem) => stockItem.id == item.stockItemId,
         );
       } catch (e) {
-        // Stock item not found, that's okay
+        // Handled in _updateItemInList
       }
     }
     
@@ -940,7 +990,7 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Editar Item'),
           content: Form(
-            key: _addItemFormKey,
+            key: _addItemFormKey, 
             child: SizedBox(
               width: double.maxFinite,
               child: Column(
@@ -958,14 +1008,12 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
                             border: OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                          ],
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Digite a quantidade';
                             }
-                            final quantity = double.tryParse(value);
+                            final quantity = int.tryParse(value);
                             if (quantity == null || quantity <= 0) {
                               return 'Quantidade inválida';
                             }
@@ -983,15 +1031,13 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
                             border: OutlineInputBorder(),
                             prefixText: 'R\$ ',
                           ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                          ],
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\\d*[,.]?\\d{0,2}'))],
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Digite o preço';
                             }
-                            final price = double.tryParse(value);
+                            final price = double.tryParse(value.replaceAll(',', '.'));
                             if (price == null || price < 0) {
                               return 'Preço inválido';
                             }
@@ -1036,32 +1082,13 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
-              onPressed: () => _updateItem(index),
+              onPressed: () => _updateItemInList(index), 
               child: const Text('Salvar'),
             ),
           ],
         ),
       ),
     );
-  }
-
-  void _updateItem(int index) {
-    if (_addItemFormKey.currentState?.validate() ?? false) {
-      final quantity = double.parse(_quantityController.text);
-      final unitValue = double.parse(_priceController.text);
-      
-      setState(() {
-        _items[index] = _items[index].copyWith(
-          quantity: quantity,
-          unitValue: unitValue,
-          stockItemId: _selectedStockItem?.id,
-          stockItemName: _selectedStockItem?.name ?? _items[index].stockItemName,
-        );
-      });
-      
-      Navigator.of(context).pop();
-      _showSnackBar('Item atualizado com sucesso!');
-    }
   }
 
   void _removeItem(int index) {

@@ -31,7 +31,6 @@ import 'core/presentation/screens/supplier_list_screen.dart';
 import 'core/presentation/screens/edit_supplier_screen.dart';
 import 'core/presentation/screens/document_list_screen.dart';
 import 'core/presentation/screens/edit_document_screen.dart';
-import 'core/presentation/screens/improved_edit_document_screen.dart';
 import 'core/presentation/screens/document_detail_screen.dart';
 import 'core/presentation/screens/reports_screen.dart';
 import 'core/presentation/screens/settings_screen.dart';
@@ -71,7 +70,6 @@ class AppRoutes {
   // Rotas para documentos
   static const documentList = '/document-list';
   static const editDocument = '/edit-document';
-  static const improvedEditDocument = '/improved-edit-document';
   static const refactoredDocumentList = '/refactored-document-list';
   static const refactoredEditDocument = '/refactored-edit-document';
   static const documentDetail = '/document-detail';
@@ -232,7 +230,6 @@ class MyApp extends StatelessWidget {
           // Rotas para documentos
           AppRoutes.documentList: (context) => const DocumentListScreen(),
           AppRoutes.editDocument: (context) => const EditDocumentScreen(),
-          AppRoutes.improvedEditDocument: (context) => const ImprovedEditDocumentScreen(),
           AppRoutes.documentDetail: (context) => const DocumentDetailScreen(documentId: 0), // Corrigido para passar o parâmetro obrigatório
           // Novas rotas
           AppRoutes.reports: (context) => const ReportsScreen(),
