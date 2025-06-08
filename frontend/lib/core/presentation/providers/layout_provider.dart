@@ -1,4 +1,4 @@
-// lib/providers/layout_provider.dart
+// lib/core/presentation/providers/layout_provider.dart
 import 'package:flutter/material.dart';
 import '../../../shared/utils/app_prefs.dart';
 

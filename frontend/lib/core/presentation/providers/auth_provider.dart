@@ -1,4 +1,4 @@
-// lib/providers/auth_provider.dart
+// lib/core/presentation/providers/auth_provider.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert'; // Para jsonEncode e jsonDecode

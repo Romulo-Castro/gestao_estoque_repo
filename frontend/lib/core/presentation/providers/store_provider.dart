@@ -1,4 +1,4 @@
-// lib/providers/store_provider.dart
+// lib/core/presentation/providers/store_provider.dart
 import 'package:flutter/foundation.dart';
 import '../../data/models/store_model.dart';
 import '../../data/datasources/api_service.dart';

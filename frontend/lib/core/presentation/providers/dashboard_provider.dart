@@ -1,4 +1,4 @@
-// lib/providers/dashboard_provider.dart
+// lib/core/presentation/providers/dashboard_provider.dart
 import 'package:flutter/foundation.dart';
 import '../../data/datasources/api_service.dart';
 import '../../../shared/utils/error_handler.dart';
