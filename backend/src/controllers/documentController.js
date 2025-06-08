@@ -118,7 +118,7 @@ exports.createDocument = catchAsync(async (req, res, next) => {
 exports.updateDocumentHeader = catchAsync(async (req, res, next) => {
     const storeId = validateId(req.params.storeId, 'ID da loja');
     const documentId = validateId(req.params.documentId, 'ID do documento');
-    const { date, customerId, supplierId, notes } = req.body;
+    const { date, document_date, customerId, supplierId, notes } = req.body;
 
     const existingDoc = await db.findDocumentByIdAndStore(documentId, storeId);
     if (!existingDoc) {
@@ -128,7 +128,7 @@ exports.updateDocumentHeader = catchAsync(async (req, res, next) => {
     // TODO: Adicionar lógica para impedir edição se o documento estiver "fechado" ou "processado"
 
     const result = await db.updateDocumentHeaderDetails(documentId, storeId, {
-        date: date || existingDoc.date, // Manter data se não fornecida
+        date: document_date || date || existingDoc.document_date, // Manter data se não fornecida
         customerId: customerId === undefined ? existingDoc.customer_id : customerId, // Permite setar para null
         supplierId: supplierId === undefined ? existingDoc.supplier_id : supplierId, // Permite setar para null
         notes: notes === undefined ? existingDoc.notes : notes?.trim() || null,
