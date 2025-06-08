@@ -12,6 +12,7 @@ import 'core/presentation/providers/item_group_provider.dart';
 import 'core/presentation/providers/customer_provider.dart';
 import 'core/presentation/providers/supplier_provider.dart';
 import 'core/presentation/providers/document_provider.dart';
+import 'core/presentation/providers/refactored_document_provider.dart';
 import 'core/presentation/providers/stock_provider.dart';
 import 'core/presentation/providers/theme_provider.dart';
 
@@ -71,6 +72,8 @@ class AppRoutes {
   static const documentList = '/document-list';
   static const editDocument = '/edit-document';
   static const improvedEditDocument = '/improved-edit-document';
+  static const refactoredDocumentList = '/refactored-document-list';
+  static const refactoredEditDocument = '/refactored-edit-document';
   static const documentDetail = '/document-detail';
   // Novas rotas
   static const reports = '/reports';
@@ -177,6 +180,14 @@ class MyApp extends StatelessWidget {
           create: (_) => DocumentProvider(),
           update: (context, auth, previous) {
             final provider = previous ?? DocumentProvider();
+            provider.updateAuthToken(auth.token);
+            return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, RefactoredDocumentProvider>(
+          create: (_) => RefactoredDocumentProvider(),
+          update: (context, auth, previous) {
+            final provider = previous ?? RefactoredDocumentProvider();
             provider.updateAuthToken(auth.token);
             return provider;
           },
