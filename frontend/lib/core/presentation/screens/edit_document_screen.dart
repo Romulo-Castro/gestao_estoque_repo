@@ -351,12 +351,13 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                   
                   setState(() {
                     _items.add(DocumentItemModel(
-                      id: null, // Changed from _selectedStockItem!.id
+                      id: null,
                       quantity: quantity,
                       unitValue: price,
                       totalValue: quantity * price,
                       description: _selectedStockItem!.name,
                       stockItemId: _selectedStockItem!.id,
+                      stockItemName: _selectedStockItem!.name,
                     ));
                     _selectedStockItem = null;
                   });
@@ -411,8 +412,11 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final itemName = item.stockItemName.isNotEmpty
+            ? item.stockItemName
+            : item.description;
         return AlertDialog(
-          title: Text('Editar ${item.description}'),
+          title: Text('Editar $itemName'),
           content: Form(
             key: editItemFormKey,
             child: Column(
@@ -427,8 +431,10 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Item: ${item.description}', 
+                      Text('Item: ${item.stockItemName.isNotEmpty ? item.stockItemName : item.description}',
                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                      if (item.description.isNotEmpty && item.stockItemName != item.description)
+                        Text(item.description, style: const TextStyle(fontSize: 12)),
                       if (item.unitValue <= 0)
                         Text(
                           '⚠️ Preço atual: R\$ 0,00 (necessário corrigir)', 
@@ -523,6 +529,7 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                       totalValue: quantity * price,
                       description: item.description,
                       stockItemId: item.stockItemId,
+                      stockItemName: item.stockItemName,
                     );
                   });
                   
@@ -1094,7 +1101,11 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4.0),
                           child: ListTile(
-                            title: Text(item.description.isNotEmpty ? item.description : 'Item ${item.stockItemId ?? 'Novo'}'),
+                            title: Text(
+                              item.stockItemName.isNotEmpty
+                                  ? item.stockItemName
+                                  : (item.description.isNotEmpty ? item.description : 'Item ${item.stockItemId ?? 'Novo'}'),
+                            ),
                             subtitle: Text(subtitleText, style: subtitleStyle),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
