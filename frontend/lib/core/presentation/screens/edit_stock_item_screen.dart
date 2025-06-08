@@ -1,5 +1,6 @@
 // lib/screens/edit_stock_item_screen.dart
 import "dart:io";
+import 'dart:math';
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:provider/provider.dart";
@@ -591,6 +592,15 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
     }
   }
 
+  /// Gera um código de barras aleatório de 13 dígitos
+  void _generateBarcode() {
+    final random = Random.secure();
+    final code = List.generate(13, (_) => random.nextInt(10)).join();
+    setState(() {
+      _propControllers[AppPrefs.propBarcode]?.text = code;
+    });
+  }
+
   // Helper para obter a imagem (local ou remota)
   ImageProvider? _getImageProvider() {
     if (_selectedImageFile != null) {
@@ -782,14 +792,12 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
                         mainAxisSize: MainAxisSize.min, // Importante para Row dentro de suffixIcon
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.edit_outlined),
-                            tooltip: 'Editar manualmente',
-                            onPressed: () {
-                              // Permitir edição direta já é o comportamento padrão
-                            },
+                            icon: const Icon(Icons.edit),
+                            tooltip: 'Gerar código',
+                            onPressed: _generateBarcode,
                           ),
                           IconButton(
-                            icon: const Icon(Icons.qr_code_scanner),
+                            icon: const Icon(Icons.camera_alt),
                             tooltip: 'Escanear código',
                             onPressed: _scanBarcode,
                           ),
