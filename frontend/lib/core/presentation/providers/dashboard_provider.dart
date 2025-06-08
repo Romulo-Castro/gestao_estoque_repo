@@ -2,6 +2,8 @@
 import 'package:flutter/foundation.dart';
 import '../../data/datasources/api_service.dart';
 import '../../../shared/utils/error_handler.dart';
+import '../../../shared/utils/app_prefs.dart';
+import '../../../shared/services/notification_service.dart';
 import '../../data/models/stock_item.dart';
 import '../../data/models/document_model.dart';
 import '../../data/models/customer_model.dart';
@@ -138,6 +140,12 @@ class DashboardProvider with ChangeNotifier, ErrorHandlingMixin {
         lowStockItems: lowStockCount,
         documentsByType: docsByType,
       );
+
+      final showNotifications =
+          await AppPrefs.getBool('showNotifications') ?? true;
+      if (showNotifications && lowStockCount > 0) {
+        NotificationService.showLowStockNotification(lowStockCount);
+      }
 
       debugPrint("[DashboardProvider] Estatísticas carregadas: ${_stats.totalProducts} produtos, ${_stats.totalDocuments} documentos");
     }, 'fetchDashboardStats');
