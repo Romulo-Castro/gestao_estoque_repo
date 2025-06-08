@@ -1,4 +1,4 @@
-// frontend/lib/providers/supplier_provider.dart
+// lib/core/presentation/providers/supplier_provider.dart
 import "package:flutter/widgets.dart";
 import "../../data/models/supplier_model.dart";
 import "../../data/datasources/api_service.dart";

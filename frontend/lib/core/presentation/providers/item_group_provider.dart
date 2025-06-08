@@ -1,4 +1,4 @@
-// frontend/lib/providers/item_group_provider.dart
+// lib/core/presentation/providers/item_group_provider.dart
 import "package:flutter/widgets.dart";
 import "../../data/models/item_group_model.dart";
 import "../../data/datasources/api_service.dart";

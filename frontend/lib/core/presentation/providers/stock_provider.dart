@@ -1,4 +1,4 @@
-// frontend/lib/providers/stock_provider.dart
+// lib/core/presentation/providers/stock_provider.dart
 import "package:flutter/foundation.dart";
 import "../../data/models/stock_item.dart";
 import "../../data/datasources/api_service.dart";
