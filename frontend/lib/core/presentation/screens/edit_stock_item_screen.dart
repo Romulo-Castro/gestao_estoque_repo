@@ -904,7 +904,7 @@ class _EditStockItemScreenState extends State<EditStockItemScreen> {
 
 
                   // --- Seleção de Grupo ---
-                  if (_activeProperties.contains(AppPrefs.propGroupId) || true) // Sempre mostrar por enquanto
+                  if (_activeProperties.contains(AppPrefs.propGroupId))
                     Card(
                       elevation: 1,
                       margin: const EdgeInsets.symmetric(vertical: 8),
