@@ -1,11 +1,14 @@
 // Clean Architecture Document Controller
 const { DateRange } = require('../../core/domain/value-objects/date-range');
-const { ValidationError } = require('../../shared/errors/validation-error');
+const ValidationError = require('../../shared/errors/validation-error');
 
 class DocumentController {
     constructor(container) {
         this.getDocumentsUseCase = container.get('getDocuments');
         this.calculateBalanceSheetUseCase = container.get('calculateBalanceSheet');
+        this.createDocumentUseCase = container.get('createDocument');
+        this.updateDocumentUseCase = container.get('updateDocument');
+        this.cancelDocumentUseCase = container.get('cancelDocument');
     }
 
     // GET /api/stores/:storeId/documents
@@ -152,30 +155,117 @@ class DocumentController {
         } catch (error) {
             next(error);
         }
-    }
-
-    // POST /api/stores/:storeId/documents (placeholder for future implementation)
+    }    // POST /api/stores/:storeId/documents
     async createDocument(req, res, next) {
-        res.status(501).json({
-            status: 'error',
-            message: 'Funcionalidade ainda não implementada na Clean Architecture'
-        });
-    }
+        try {
+            const storeId = parseInt(req.params.storeId);
+            const { type, documentDate, customerId, supplierId, notes, items } = req.body;
 
-    // PUT /api/stores/:storeId/documents/:documentId (placeholder for future implementation)
+            // Validate required fields
+            if (!type || !documentDate || !items || !Array.isArray(items) || items.length === 0) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Tipo, data do documento e itens são obrigatórios'
+                });
+            }
+
+            const result = await this.createDocumentUseCase.execute({
+                storeId,
+                type,
+                documentDate: new Date(documentDate),
+                customerId,
+                supplierId,
+                notes,
+                items
+            });
+
+            res.status(201).json({
+                status: 'success',
+                message: 'Documento criado com sucesso',
+                data: result.data
+            });
+        } catch (error) {
+            if (error instanceof ValidationError) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: error.message,
+                    errors: error.errors
+                });
+            }
+            next(error);
+        }
+    }    // PUT /api/stores/:storeId/documents/:documentId
     async updateDocumentHeader(req, res, next) {
-        res.status(501).json({
-            status: 'error',
-            message: 'Funcionalidade ainda não implementada na Clean Architecture'
-        });
-    }
+        try {
+            const storeId = parseInt(req.params.storeId);
+            const documentId = parseInt(req.params.documentId);
+            const { documentDate, customerId, supplierId, notes } = req.body;
 
-    // DELETE /api/stores/:storeId/documents/:documentId (placeholder for future implementation)
+            const updateData = {};
+            if (documentDate !== undefined) updateData.documentDate = new Date(documentDate);
+            if (customerId !== undefined) updateData.customerId = customerId;
+            if (supplierId !== undefined) updateData.supplierId = supplierId;
+            if (notes !== undefined) updateData.notes = notes;
+
+            const result = await this.updateDocumentUseCase.execute({
+                documentId,
+                storeId,
+                ...updateData
+            });
+
+            res.status(200).json({
+                status: 'success',
+                message: 'Documento atualizado com sucesso',
+                data: result.data
+            });
+        } catch (error) {
+            if (error instanceof ValidationError) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: error.message,
+                    errors: error.errors
+                });
+            }
+            if (error.message === 'Documento não encontrado') {
+                return res.status(404).json({
+                    status: 'error',
+                    message: error.message
+                });
+            }
+            next(error);
+        }
+    }    // DELETE /api/stores/:storeId/documents/:documentId
     async cancelDocument(req, res, next) {
-        res.status(501).json({
-            status: 'error',
-            message: 'Funcionalidade ainda não implementada na Clean Architecture'
-        });
+        try {
+            const storeId = parseInt(req.params.storeId);
+            const documentId = parseInt(req.params.documentId);
+
+            const result = await this.cancelDocumentUseCase.execute({
+                documentId,
+                storeId
+            });
+
+            res.status(200).json({
+                status: 'success',
+                message: 'Documento cancelado com sucesso',
+                data: result.data
+            });
+        } catch (error) {
+            if (error instanceof ValidationError) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: error.message,
+                    errors: error.errors
+                });
+            }
+            if (error.message === 'Documento não encontrado') {
+                return res.status(404).json({
+                    status: 'error',
+                    message: error.message
+                });
+            }
+            next(error);
+        }
     }
 }
 

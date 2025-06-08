@@ -71,12 +71,12 @@ function Validate-FixedFiles {
     Write-Host "Validating Fixed Files..." -ForegroundColor Yellow
     
     $fixedFiles = @(
-        "$FrontendPath\lib\widgets\app_drawer.dart",
-        "$FrontendPath\lib\screens\item_group_list_screen.dart",
-        "$FrontendPath\lib\screens\edit_document_screen.dart",
-        "$FrontendPath\lib\screens\reports_screen.dart",
-        "$FrontendPath\lib\screens\customer_list_screen.dart",
-        "$FrontendPath\lib\screens\supplier_list_screen.dart"
+        "$FrontendPath\lib\core\presentation\widgets\app_drawer.dart",
+        "$FrontendPath\lib\core\presentation\screens\item_group_list_screen.dart",
+        "$FrontendPath\lib\core\presentation\screens\edit_document_screen.dart",
+        "$FrontendPath\lib\core\presentation\screens\reports_screen.dart",
+        "$FrontendPath\lib\core\presentation\screens\customer_list_screen.dart",
+        "$FrontendPath\lib\core\presentation\screens\supplier_list_screen.dart"
     )
     
     $allFilesExist = $true

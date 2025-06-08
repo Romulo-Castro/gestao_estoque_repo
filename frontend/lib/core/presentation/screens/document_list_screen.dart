@@ -650,8 +650,7 @@ class _DocumentListScreenState extends State<DocumentListScreen>
               height: 72,
               color: color,
             ),
-            const SizedBox(width: 12),
-            // Document content
+            const SizedBox(width: 12),            // Document content
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -666,7 +665,8 @@ class _DocumentListScreenState extends State<DocumentListScreen>
                         fontWeight: FontWeight.w600,
                         color: Colors.black87,
                       ),
-                    ),                    const SizedBox(height: 4),
+                    ),
+                    const SizedBox(height: 4),
                     // Date and type
                     Text(
                       "$formattedDate • ${_getDocumentTypeDisplayName(doc.type)}",
@@ -676,7 +676,40 @@ class _DocumentListScreenState extends State<DocumentListScreen>
                       ),
                     ),
                     const SizedBox(height: 2),
-                    // Status/comments
+                    // Items information
+                    if (doc.items.isNotEmpty) ...[
+                      Text(
+                        "${doc.items.length} ${doc.items.length == 1 ? 'item' : 'itens'} • Total: R\$ ${doc.totalValue.toStringAsFixed(2)}",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      // First few items preview
+                      if (doc.items.isNotEmpty)
+                        Text(
+                          _getItemsPreview(doc.items),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ] else ...[
+                      Text(
+                        "Nenhum item • Total: R\$ ${doc.totalValue.toStringAsFixed(2)}",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 2),
+                    // Status
                     Text(
                       doc.status,
                       style: TextStyle(
@@ -700,6 +733,21 @@ class _DocumentListScreenState extends State<DocumentListScreen>
         ),
       ),
     );
+  }
+
+  // Helper method to generate preview of items in a document
+  String _getItemsPreview(List<DocumentItemModel> items) {
+    if (items.isEmpty) return '';
+    
+    if (items.length == 1) {
+      final item = items.first;
+      return '${item.description} (${item.quantity}x)';
+    } else if (items.length <= 3) {
+      return items.map((item) => '${item.description} (${item.quantity}x)').join(', ');
+    } else {
+      final firstTwo = items.take(2).map((item) => '${item.description} (${item.quantity}x)').join(', ');
+      return '$firstTwo e mais ${items.length - 2} ${items.length - 2 == 1 ? 'item' : 'itens'}';
+    }
   }
 
   Widget _buildQuickActionBar() {

@@ -7,7 +7,6 @@ import '../providers/store_provider.dart';
 import '../providers/layout_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/user_profile_provider.dart'; // Added import for UserProfileProvider
-import '../../data/datasources/api_service.dart'; // Added import for ApiService
 import '../../../shared/utils/app_prefs.dart';
 import '../widgets/app_drawer.dart';
 
@@ -165,7 +164,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _showEditProfileDialog() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    // final userProfileProvider = Provider.of<UserProfileProvider>(context, listen: false); // Not used in the refactored version
+    final userProfileProvider = Provider.of<UserProfileProvider>(context, listen: false);
     final currentUser = authProvider.user;
 
     if (currentUser == null) return;
@@ -184,9 +183,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isLoading = true;
       });
       try {
-        // Use the proper UserProfileProvider for complete profile update including password
-        final userProfileProvider = UserProfileProvider(ApiService(), authProvider);
-        
+        // Use the UserProfileProvider from context (which has the correct token)
         final success = await userProfileProvider.updateProfile(
           name: result['name']!,
           email: result['email']!,

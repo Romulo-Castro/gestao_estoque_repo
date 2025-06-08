@@ -5,14 +5,11 @@ const Quantity = require('../../../domain/value-objects/quantity');
 class SQLiteStockRepository {
     constructor(database) {
         this.db = database;
-    }
-
-    async findByStoreId(storeId) {
+    }    async findByStoreId(storeId) {
         const sql = `
             SELECT 
                 si.*,
-                g.name as group_name,
-                g.description as group_description
+                g.name as group_name
             FROM stock_items si
             LEFT JOIN item_groups g ON si.group_id = g.id
             WHERE si.store_id = ?
@@ -21,14 +18,11 @@ class SQLiteStockRepository {
         
         const rows = await this.db.all(sql, [storeId]);
         return rows.map(row => this.mapRowToEntity(row));
-    }
-
-    async findById(itemId, storeId) {
+    }    async findById(itemId, storeId) {
         const sql = `
             SELECT 
                 si.*,
-                g.name as group_name,
-                g.description as group_description
+                g.name as group_name
             FROM stock_items si
             LEFT JOIN item_groups g ON si.group_id = g.id
             WHERE si.id = ? AND si.store_id = ?
@@ -36,6 +30,10 @@ class SQLiteStockRepository {
         
         const row = await this.db.get(sql, [itemId, storeId]);
         return row ? this.mapRowToEntity(row) : null;
+    }
+
+    async findByIdAndStore(itemId, storeId) {
+        return await this.findById(itemId, storeId);
     }
 
     async save(stockItem) {
@@ -107,14 +105,11 @@ class SQLiteStockRepository {
         ]);
         
         return result.changes > 0;
-    }
-
-    async findByGroupId(groupId, storeId) {
+    }    async findByGroupId(groupId, storeId) {
         const sql = `
             SELECT 
                 si.*,
-                g.name as group_name,
-                g.description as group_description
+                g.name as group_name
             FROM stock_items si
             LEFT JOIN item_groups g ON si.group_id = g.id
             WHERE si.group_id = ? AND si.store_id = ?
@@ -123,14 +118,11 @@ class SQLiteStockRepository {
         
         const rows = await this.db.all(sql, [groupId, storeId]);
         return rows.map(row => this.mapRowToEntity(row));
-    }
-
-    async searchByName(storeId, searchTerm) {
+    }    async searchByName(storeId, searchTerm) {
         const sql = `
             SELECT 
                 si.*,
-                g.name as group_name,
-                g.description as group_description
+                g.name as group_name
             FROM stock_items si
             LEFT JOIN item_groups g ON si.group_id = g.id
             WHERE si.store_id = ? AND si.name LIKE ?
@@ -145,14 +137,11 @@ class SQLiteStockRepository {
         const sql = `SELECT COUNT(*) as count FROM stock_items WHERE store_id = ?`;
         const row = await this.db.get(sql, [storeId]);
         return row.count || 0;
-    }
-
-    async getLowStockItems(storeId, threshold = 10) {
+    }    async getLowStockItems(storeId, threshold = 10) {
         const sql = `
             SELECT 
                 si.*,
-                g.name as group_name,
-                g.description as group_description
+                g.name as group_name
             FROM stock_items si
             LEFT JOIN item_groups g ON si.group_id = g.id
             WHERE si.store_id = ? AND si.quantity <= ?
@@ -161,9 +150,7 @@ class SQLiteStockRepository {
         
         const rows = await this.db.all(sql, [storeId, threshold]);
         return rows.map(row => this.mapRowToEntity(row));
-    }
-
-    mapRowToEntity(row) {
+    }    mapRowToEntity(row) {
         const properties = row.properties ? JSON.parse(row.properties) : {};
         
         return new StockItem({
@@ -177,8 +164,7 @@ class SQLiteStockRepository {
             createdAt: new Date(row.created_at),
             updatedAt: new Date(row.updated_at),
             // Additional group information if joined
-            groupName: row.group_name,
-            groupDescription: row.group_description
+            groupName: row.group_name
         });
     }
 }

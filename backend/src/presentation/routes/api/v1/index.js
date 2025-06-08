@@ -6,11 +6,9 @@ const createCustomerRoutes = require('./customer-routes');
 const createAuthRoutes = require('./auth-routes');
 
 const createV1Routes = (container) => {
-    const router = express.Router();
-
-    // Mount Clean Architecture routes
-    router.use('/stock', createStockRoutes(container));
-    router.use('/documents', createDocumentRoutes(container));
+    const router = express.Router();    // Mount Clean Architecture routes
+    router.use('/stores/:storeId/stock', createStockRoutes(container));
+    router.use('/stores/:storeId/documents', createDocumentRoutes(container));
     router.use('/stores/:storeId/customers', createCustomerRoutes(container));
     router.use('/auth', createAuthRoutes(container));
 

@@ -30,6 +30,7 @@ import 'core/presentation/screens/supplier_list_screen.dart';
 import 'core/presentation/screens/edit_supplier_screen.dart';
 import 'core/presentation/screens/document_list_screen.dart';
 import 'core/presentation/screens/edit_document_screen.dart';
+import 'core/presentation/screens/improved_edit_document_screen.dart';
 import 'core/presentation/screens/document_detail_screen.dart';
 import 'core/presentation/screens/reports_screen.dart';
 import 'core/presentation/screens/settings_screen.dart';
@@ -69,6 +70,7 @@ class AppRoutes {
   // Rotas para documentos
   static const documentList = '/document-list';
   static const editDocument = '/edit-document';
+  static const improvedEditDocument = '/improved-edit-document';
   static const documentDetail = '/document-detail';
   // Novas rotas
   static const reports = '/reports';
@@ -90,7 +92,7 @@ void main() async {
     await NotificationService.initialize();
   } catch (e) {
     // Ignora erros de inicialização em plataformas não suportadas (como web)
-    print('Notification service initialization failed (likely web platform): $e');
+    // Debug: Notification service initialization failed (likely web platform)
   }
 
   // Initialize Clean Architecture dependencies
@@ -116,9 +118,16 @@ class MyApp extends StatelessWidget {
         
         // User Profile Provider depends on Auth Provider
         ChangeNotifierProxyProvider<AuthProvider, UserProfileProvider>(
-          create: (_) => UserProfileProvider(apiService, AuthProvider(apiService)),
+          create: (context) {
+            final auth = Provider.of<AuthProvider>(context, listen: false);
+            final userApiService = ApiService();
+            userApiService.updateAuthToken(auth.token);
+            return UserProfileProvider(userApiService, auth);
+          },
           update: (context, auth, previous) {
-            return UserProfileProvider(apiService, auth);
+            final userApiService = ApiService();
+            userApiService.updateAuthToken(auth.token);
+            return UserProfileProvider(userApiService, auth);
           },
         ),
         
@@ -212,6 +221,7 @@ class MyApp extends StatelessWidget {
           // Rotas para documentos
           AppRoutes.documentList: (context) => const DocumentListScreen(),
           AppRoutes.editDocument: (context) => const EditDocumentScreen(),
+          AppRoutes.improvedEditDocument: (context) => const ImprovedEditDocumentScreen(),
           AppRoutes.documentDetail: (context) => const DocumentDetailScreen(documentId: 0), // Corrigido para passar o parâmetro obrigatório
           // Novas rotas
           AppRoutes.reports: (context) => const ReportsScreen(),

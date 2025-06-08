@@ -46,9 +46,7 @@ class GetStockItems {
             const unitPrice = item.properties?.price || 0;
             return total + (item.quantity.value * unitPrice);
         }, 0);
-    }
-
-    mapToDTO(stockItem) {
+    }    mapToDTO(stockItem) {
         return {
             id: stockItem.id,
             storeId: stockItem.storeId,
@@ -61,10 +59,9 @@ class GetStockItems {
             imageUrl: stockItem.imageFilename ? this.buildImageUrl(stockItem.imageFilename) : null,
             createdAt: stockItem.createdAt,
             updatedAt: stockItem.updatedAt,
-            groupName: stockItem.groupName,
-            groupDescription: stockItem.groupDescription
+            groupName: stockItem.groupName
         };
-    }    buildImageUrl(filename) {
+    }buildImageUrl(filename) {
         if (!filename) return null;
         // Import PlatformUrlService for URL building
         const PlatformUrlService = require('../../../../shared/services/platform-url-service');

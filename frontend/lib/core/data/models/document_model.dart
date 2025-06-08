@@ -162,47 +162,52 @@ class DocumentModel {
 
 class DocumentItemModel {
   final int? id;
-  final int quantity;
+  final double quantity;
   final double unitValue;
   final double totalValue;
   final String description;
   final int? stockItemId;
+  final String stockItemName;
 
   const DocumentItemModel({
     this.id,
     required this.quantity,
     required this.unitValue,
-    required this.totalValue,
-    required this.description,
+    double? totalValue,
+    this.description = '',
     this.stockItemId,
-  });
+    this.stockItemName = '',
+  }) : totalValue = totalValue ?? (quantity * unitValue);
 
   factory DocumentItemModel.fromJson(Map<String, dynamic> json) {
+    final quantity = (json['quantity'] ?? 0).toDouble();
+    final unitValue = (json['unit_value'] ?? 0.0).toDouble();
+    
     return DocumentItemModel(
       id: json['id'],
-      quantity: json['quantity'] ?? 0,
-      unitValue: (json['unit_value'] ?? 0.0).toDouble(),
-      totalValue: (json['total_value'] ?? 0.0).toDouble(),
+      quantity: quantity,
+      unitValue: unitValue,
+      totalValue: (json['total_value'] ?? (quantity * unitValue)).toDouble(),
       description: json['description'] ?? '',
       stockItemId: json['stock_item_id'] ?? json['itemId'], // Also check for 'itemId'
+      stockItemName: json['stock_item_name'] ?? json['name'] ?? '',
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      if (id != null) 'id': id,
+      'itemId': stockItemId, // Map stockItemId to itemId for backend compatibility
       'quantity': quantity,
       'unit_value': unitValue,
       'total_value': totalValue,
       'description': description,
-      'itemId': stockItemId, // Changed from 'stock_item_id' to 'itemId'
     };
   }
 
   DocumentItemEntity toEntity() {
     return DocumentItemEntity(
       id: id,
-      quantity: quantity,
+      quantity: quantity.toInt(),
       unitValue: unitValue,
       totalValue: totalValue,
       description: description,
@@ -213,11 +218,35 @@ class DocumentItemModel {
   factory DocumentItemModel.fromEntity(DocumentItemEntity entity) {
     return DocumentItemModel(
       id: entity.id,
-      quantity: entity.quantity,
+      quantity: entity.quantity.toDouble(),
       unitValue: entity.unitValue,
       totalValue: entity.totalValue,
       description: entity.description,
       stockItemId: entity.stockItemId,
+    );
+  }
+
+  /// copyWith method for immutable updates
+  DocumentItemModel copyWith({
+    int? id,
+    double? quantity,
+    double? unitValue,
+    double? totalValue,
+    String? description,
+    int? stockItemId,
+    String? stockItemName,
+  }) {
+    final newQuantity = quantity ?? this.quantity;
+    final newUnitValue = unitValue ?? this.unitValue;
+    
+    return DocumentItemModel(
+      id: id ?? this.id,
+      quantity: newQuantity,
+      unitValue: newUnitValue,
+      totalValue: totalValue ?? (newQuantity * newUnitValue),
+      description: description ?? this.description,
+      stockItemId: stockItemId ?? this.stockItemId,
+      stockItemName: stockItemName ?? this.stockItemName,
     );
   }
 }

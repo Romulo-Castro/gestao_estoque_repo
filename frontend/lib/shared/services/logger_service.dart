@@ -57,11 +57,10 @@ class LoggerService {
     // In debug mode, use debugPrint for better console output
     if (kDebugMode) {
       debugPrint(logMessage);
-    } else {
-      // In release mode, you might want to send logs to a service
+    } else {      // In release mode, you might want to send logs to a service
       // For now, we'll still print to console but this could be replaced
       // with a service like Firebase Crashlytics, Sentry, etc.
-      print(logMessage);
+      // Debug: $logMessage
     }
   }
   

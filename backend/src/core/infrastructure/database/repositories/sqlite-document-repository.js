@@ -207,6 +207,84 @@ class SQLiteDocumentRepository {
         return result.changes > 0;
     }
 
+    // New methods for use cases
+    async findByIdAndStore(documentId, storeId) {
+        return await this.findById(documentId, storeId);
+    }
+
+    async findByIdAndStoreWithItems(documentId, storeId) {
+        return await this.findById(documentId, storeId);
+    }
+
+    async createWithTransaction(document, stockAdjustments = []) {
+        try {
+            await this.db.run('BEGIN TRANSACTION');
+
+            // Create the document
+            const savedDocument = await this.save(document);
+
+            // Apply stock adjustments if provided
+            for (const adjustment of stockAdjustments) {
+                await this.db.run(
+                    'UPDATE stock_items SET quantity = quantity + ?, updated_at = ? WHERE id = ? AND store_id = ?',
+                    [adjustment.quantityChange, new Date().toISOString(), adjustment.stockItemId, document.storeId]
+                );
+            }
+
+            await this.db.run('COMMIT');
+            return savedDocument;
+        } catch (error) {
+            await this.db.run('ROLLBACK');
+            throw error;
+        }
+    }
+
+    async updateHeader(documentId, storeId, headerData) {
+        const sql = `
+            UPDATE documents 
+            SET document_date = ?, customer_id = ?, supplier_id = ?, notes = ?, updated_at = ?
+            WHERE id = ? AND store_id = ?
+        `;
+        
+        const result = await this.db.run(sql, [
+            headerData.documentDate ? headerData.documentDate.toISOString() : null,
+            headerData.customerId || null,
+            headerData.supplierId || null,
+            headerData.notes || null,
+            new Date().toISOString(),
+            documentId,
+            storeId
+        ]);
+        
+        return result.changes > 0;
+    }
+
+    async cancelWithTransaction(documentId, storeId, stockReversals = []) {
+        try {
+            await this.db.run('BEGIN TRANSACTION');
+
+            // Update document status to cancelled
+            const statusUpdated = await this.updateStatus(documentId, storeId, 'CANCELADO');
+            if (!statusUpdated) {
+                throw new Error('Documento não encontrado');
+            }
+
+            // Apply stock reversals if provided
+            for (const reversal of stockReversals) {
+                await this.db.run(
+                    'UPDATE stock_items SET quantity = quantity + ?, updated_at = ? WHERE id = ? AND store_id = ?',
+                    [reversal.quantityChange, new Date().toISOString(), reversal.stockItemId, storeId]
+                );
+            }
+
+            await this.db.run('COMMIT');
+            return await this.findByIdAndStore(documentId, storeId);
+        } catch (error) {
+            await this.db.run('ROLLBACK');
+            throw error;
+        }
+    }
+
     async findByDateRange(storeId, dateRange) {
         const sql = `
             SELECT 

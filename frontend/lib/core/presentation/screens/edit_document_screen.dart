@@ -178,21 +178,67 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
 
     setState(() => _isLoading = true);
 
-    try {      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+    try {
+      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
       final document = await docProvider.fetchDocumentById(int.parse(_documentId!));
 
       if (document != null) {
         setState(() {
+          // Load basic document fields
           _numberController.text = document.number;
           _dateController.text = document.date;
-          // Note: DocumentModel doesn't have reference and notes fields
           _selectedType = _parseDocumentType(document.type);
+          
+          // Load description/notes if available
+          _notesController.text = document.description;
+          
+          // Parse and set the date properly
+          try {
+            if (document.date.isNotEmpty) {
+              // Try to parse the date from the document
+              final parsedDate = DateTime.tryParse(document.date);
+              if (parsedDate != null) {
+                _selectedDate = parsedDate;
+                _dateController.text = "${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}";
+              }
+            }
+          } catch (e) {
+            // If date parsing fails, keep current date
+            debugPrint('Erro ao parsear data do documento: $e');
+          }
+          
+          // Load document items - preserve all original values
           _items.clear();
-          _items.addAll(document.items);
+          if (document.items.isNotEmpty) {
+            for (final item in document.items) {
+              // Load items exactly as they come from the backend - don't modify values
+              final documentItem = DocumentItemModel(
+                id: item.id,
+                quantity: item.quantity,
+                unitValue: item.unitValue,
+                totalValue: item.totalValue,
+                description: item.description.isNotEmpty ? item.description : 'Item sem descrição',
+                stockItemId: item.stockItemId,
+                stockItemName: item.stockItemName,
+              );
+              _items.add(documentItem);
+            }
+          }
+          
+          debugPrint('Documento carregado: ${document.number} com ${_items.length} itens');
+          for (final item in _items) {
+            debugPrint('Item: ${item.description}, Qtd: ${item.quantity}, Valor Unit: ${item.unitValue}, Total: ${item.totalValue}');
+          }
         });
-      }    } catch (e) {
+      } else {
+        if (mounted) {
+          ErrorHandler.showErrorSnackBar(context, 'Documento não encontrado');
+        }
+      }
+    } catch (e) {
       if (!mounted) return;
       ErrorHandler.showErrorSnackBar(context, 'Erro ao carregar documento: $e');
+      debugPrint('Erro detalhado ao carregar documento: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -306,7 +352,7 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                   setState(() {
                     _items.add(DocumentItemModel(
                       id: null, // Changed from _selectedStockItem!.id
-                      quantity: quantity.toInt(),
+                      quantity: quantity,
                       unitValue: price,
                       totalValue: quantity * price,
                       description: _selectedStockItem!.name,
@@ -321,6 +367,169 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                 }
               },
               child: const Text('Adicionar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEditItemDialog(int index) {
+    final item = _items[index];
+    final editQuantityController = TextEditingController(text: item.quantity.toString());
+    
+    // Try to get a suggested price from stock item or use current value
+    double suggestedPrice = item.unitValue;
+    if (suggestedPrice <= 0) {
+      // Try to get price from stock item properties
+      final stockProvider = Provider.of<StockProvider>(context, listen: false);
+      final stockItem = stockProvider.items.firstWhere(
+        (stockItem) => stockItem.id == item.stockItemId,
+        orElse: () => StockItem(
+          id: 0, 
+          storeId: 0, 
+          name: '', 
+          quantity: 0, 
+          properties: {},
+          createdAt: '',
+          updatedAt: ''
+        ),
+      );
+      
+      if (stockItem.id > 0 && stockItem.price != null && stockItem.price! > 0) {
+        suggestedPrice = stockItem.price!;
+      } else if (stockItem.properties['price'] != null) {
+        suggestedPrice = double.tryParse(stockItem.properties['price'].toString()) ?? 0.0;
+      }
+    }
+    
+    final editPriceController = TextEditingController(
+      text: suggestedPrice > 0 ? suggestedPrice.toStringAsFixed(2) : '0.00'
+    );
+    final editItemFormKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Editar ${item.description}'),
+          content: Form(
+            key: editItemFormKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Item: ${item.description}', 
+                           style: const TextStyle(fontWeight: FontWeight.bold)),
+                      if (item.unitValue <= 0)
+                        Text(
+                          '⚠️ Preço atual: R\$ 0,00 (necessário corrigir)', 
+                          style: TextStyle(color: Colors.orange[700], fontSize: 12)
+                        ),
+                      if (suggestedPrice > 0 && suggestedPrice != item.unitValue)
+                        Text(
+                          '💡 Preço sugerido: R\$ ${suggestedPrice.toStringAsFixed(2)}', 
+                          style: TextStyle(color: Colors.green[700], fontSize: 12)
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: editQuantityController,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantidade*',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Digite a quantidade';
+                    }
+                    final quantity = double.tryParse(value);
+                    if (quantity == null || quantity <= 0) {
+                      return 'Quantidade deve ser maior que zero';
+                    }
+                    // Validar quantidade disponível para saída
+                    if (_selectedType == DocumentType.saida) {
+                      // Buscar o item no estoque para verificar disponibilidade
+                      final stockProvider = Provider.of<StockProvider>(context, listen: false);
+                      final stockItem = stockProvider.items.firstWhere(
+                        (stockItem) => stockItem.id == item.stockItemId,
+                        orElse: () => StockItem(
+                          id: 0, 
+                          storeId: 0, 
+                          name: '', 
+                          quantity: 0, 
+                          properties: {},
+                          createdAt: '',
+                          updatedAt: ''
+                        ),
+                      );
+                      if (stockItem.id > 0 && quantity > stockItem.quantity + item.quantity) {
+                        return 'Quantidade não disponível em estoque (${stockItem.quantity + item.quantity} disponível)';
+                      }
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: editPriceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Preço Unitário*',
+                    prefixText: 'R\$ ',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Digite o preço';
+                    }
+                    final price = double.tryParse(value);
+                    if (price == null || price < 0) {
+                      return 'Preço deve ser maior ou igual a zero';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (editItemFormKey.currentState!.validate()) {
+                  final quantity = double.parse(editQuantityController.text);
+                  final price = double.parse(editPriceController.text);
+                  
+                  setState(() {
+                    _items[index] = DocumentItemModel(
+                      id: item.id,
+                      quantity: quantity,
+                      unitValue: price,
+                      totalValue: quantity * price,
+                      description: item.description,
+                      stockItemId: item.stockItemId,
+                    );
+                  });
+                  
+                  Navigator.of(context).pop();
+                }
+              },
+              child: const Text('Salvar'),
             ),
           ],
         );
@@ -346,6 +555,98 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
       return;
     }
     if (!mounted) return;
+
+    // Comprehensive validation before saving
+    if (_items.isEmpty) {
+      ErrorHandler.showErrorSnackBar(context, 'Adicione pelo menos um item ao documento antes de salvar.');
+      return;
+    }
+
+    // Validate items for common issues
+    final List<String> warnings = [];
+    final List<String> errors = [];
+
+    for (var i = 0; i < _items.length; i++) {
+      final item = _items[i];
+      final itemPosition = i + 1;
+
+      // Check for missing stockItemId
+      if (item.stockItemId == null || item.stockItemId == 0) {
+        errors.add('Item $itemPosition "${item.description}": ID do item de estoque ausente. Remova e adicione novamente.');
+        continue;
+      }
+
+      // Check for empty description
+      if (item.description.trim().isEmpty) {
+        errors.add('Item $itemPosition: Descrição não pode estar vazia.');
+        continue;
+      }
+
+      // Check for zero or negative quantity
+      if (item.quantity <= 0) {
+        errors.add('Item $itemPosition "${item.description}": Quantidade deve ser maior que zero.');
+        continue;
+      }
+
+      // Check for zero unit value (warning for drafts, but allow saving)
+      if (item.unitValue <= 0) {
+        warnings.add('Item $itemPosition "${item.description}": Valor unitário zerado (R\$ ${item.unitValue.toStringAsFixed(2)})');
+      }
+    }
+
+    // Show errors and stop if any critical issues found
+    if (errors.isNotEmpty) {
+      final errorMessage = 'Erros encontrados:\n${errors.join('\n')}';
+      ErrorHandler.showErrorSnackBar(context, errorMessage);
+      return;
+    }
+
+    // Show warnings but allow user to continue
+    if (warnings.isNotEmpty) {
+      final continueWithWarnings = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Valores Zerados Detectados'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Os seguintes itens possuem valores zerados:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ...warnings.map((warning) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text('• $warning'),
+                )),
+                const SizedBox(height: 16),
+                const Text(
+                  'Deseja continuar salvando o rascunho mesmo assim?\n\nRecomendação: Corrija os valores antes de processar o documento.',
+                  style: TextStyle(color: Colors.orange),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              child: const Text('Salvar Mesmo Assim'),
+            ),
+          ],
+        ),
+      );
+
+      if (continueWithWarnings != true) {
+        return; // User canceled
+      }
+    }
 
     setState(() => _isLoading = true);
 
@@ -700,38 +1001,16 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                     // --- Itens do Documento ---
                     Consumer<StockProvider>(
                       builder: (context, stockProvider, child) {
-                        if (stockProvider.isLoading) {
-                          return const Card(
-                            child: Padding(
-                              padding: EdgeInsets.all(16.0),
-                              child: Row(
-                                children: [
-                                  CircularProgressIndicator(),
-                                  SizedBox(width: 16),
-                                  Text('Carregando itens...'),
-                                ],
-                              ),
-                            ),
-                          );
+                        if (stockProvider.isLoading && stockProvider.items.isEmpty) {
+                          return const Center(child: CircularProgressIndicator());
                         }
-                        
-                        if (stockProvider.hasError) {
+                        if (!stockProvider.isLoading && stockProvider.error != null) {
                           return Card(
                             child: Padding(
                               padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                children: [
-                                  Text('Erro ao carregar itens: ${stockProvider.error}'),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      final storeProvider = Provider.of<StoreProvider>(context, listen: false);
-                                      if (storeProvider.selectedStoreId != null) {
-                                        stockProvider.setStoreId(storeProvider.selectedStoreId);
-                                      }
-                                    },
-                                    child: const Text('Tentar novamente'),
-                                  ),
-                                ],
+                              child: Text(
+                                'Erro ao carregar itens de estoque: ${stockProvider.error}\\nPor favor, tente atualizar.',
+                                style: TextStyle(color: Colors.red[700]),
                               ),
                             ),
                           );
@@ -740,7 +1019,7 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                         if (stockProvider.items.isEmpty) {
                           return const Card(
                             child: Padding(
-                              padding: EdgeInsets.all(16.0),
+                              padding: const EdgeInsets.all(16.0),
                               child: Text('Nenhum item de estoque disponível. Cadastre itens primeiro.'),
                             ),
                           );
@@ -758,6 +1037,28 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                           onChanged: (value) {
                             setState(() {
                               _selectedStockItem = value;
+                              if (_selectedStockItem != null) {
+                                double priceFromStock = 0.0;
+                                // Try to get price from StockItem.price (direct field)
+                                if (_selectedStockItem!.price != null && _selectedStockItem!.price! > 0) {
+                                  priceFromStock = _selectedStockItem!.price!;
+                                } 
+                                // Else, try to get from StockItem.properties['price']
+                                else if (_selectedStockItem!.properties['price'] != null) {
+                                  final propPrice = _selectedStockItem!.properties['price'];
+                                  if (propPrice is num) {
+                                    priceFromStock = propPrice.toDouble();
+                                  } else if (propPrice is String) {
+                                    priceFromStock = double.tryParse(propPrice) ?? 0.0;
+                                  }
+                                }
+                                _priceController.text = priceFromStock > 0 ? priceFromStock.toStringAsFixed(2) : "0.00";
+                                _quantityController.text = "1"; // Default quantity to 1
+                              } else {
+                                // Clear price and quantity if no item is selected
+                                _priceController.text = "0.00";
+                                _quantityController.text = "1";
+                              }
                             });
                           },
                         );
@@ -776,52 +1077,45 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                       itemCount: _items.length,
                       itemBuilder: (context, index) {
                         final item = _items[index];
+                        bool hasZeroValue = item.unitValue <= 0;
+                        
+                        String priceStr = item.unitValue.toStringAsFixed(2);
+                        String totalStr = item.totalValue.toStringAsFixed(2);
+                        // Corrected subtitleText construction
+                        String subtitleText = 'Qtd: ${item.quantity}, Preço Unit: R\\\$ ' + priceStr + ', Total: R\\\$ ' + totalStr;
+                        
+                        TextStyle? subtitleStyle;
+                        if (hasZeroValue) {
+                          // Corrected warning text concatenation
+                          subtitleText += '\\n⚠️ Valores zerados - clique para corrigir';
+                          subtitleStyle = TextStyle(color: Colors.orange[700], fontWeight: FontWeight.bold);
+                        }
+
                         return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 4.0),
                           child: ListTile(
-                            title: Text(item.description),
-                            subtitle: Text('Quantidade: ${item.quantity} - R\$ ${item.unitValue.toStringAsFixed(2)} cada'),
+                            title: Text(item.description.isNotEmpty ? item.description : 'Item ${item.stockItemId ?? 'Novo'}'),
+                            subtitle: Text(subtitleText, style: subtitleStyle),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text('R\$ ${item.totalValue.toStringAsFixed(2)}', 
-                                     style: const TextStyle(fontWeight: FontWeight.bold)),
                                 IconButton(
-                                  icon: const Icon(Icons.delete),
+                                  icon: const Icon(Icons.edit, color: Colors.blue),
+                                  onPressed: () => _showEditItemDialog(index),
+                                  tooltip: 'Editar Item',
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
                                   onPressed: () => _removeItem(index),
+                                  tooltip: 'Remover Item',
                                 ),
                               ],
                             ),
+                            onTap: () => _showEditItemDialog(index),
                           ),
                         );
                       },
                     ),
-                    // Show total amount
-                    if (_items.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Card(
-                        color: Theme.of(context).primaryColor.withOpacity(0.1),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Total do Documento:',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                'R\$ ${_items.fold(0.0, (sum, item) => sum + item.totalValue).toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  fontSize: 20, 
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),

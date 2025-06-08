@@ -78,9 +78,7 @@ class UpdateStockItem {
         if (errors.length > 0) {
             throw new ValidationError('Dados de entrada inválidos', errors);
         }
-    }
-
-    mapToDTO(stockItem) {
+    }    mapToDTO(stockItem) {
         return {
             id: stockItem.id,
             storeId: stockItem.storeId,
@@ -93,10 +91,9 @@ class UpdateStockItem {
             imageUrl: stockItem.imageFilename ? this.buildImageUrl(stockItem.imageFilename) : null,
             createdAt: stockItem.createdAt,
             updatedAt: stockItem.updatedAt,
-            groupName: stockItem.groupName,
-            groupDescription: stockItem.groupDescription
+            groupName: stockItem.groupName
         };
-    }    buildImageUrl(filename) {
+    }buildImageUrl(filename) {
         if (!filename) return null;
         // Import PlatformUrlService for URL building
         const PlatformUrlService = require('../../../../shared/services/platform-url-service');
