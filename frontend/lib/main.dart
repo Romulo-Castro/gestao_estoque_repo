@@ -41,6 +41,7 @@ import 'core/presentation/screens/help_screen.dart';
 // Importar Utilitários e Preferências
 import 'shared/utils/app_prefs.dart';
 import 'core/data/datasources/api_service.dart';
+import 'shared/services/notification_service.dart';
 
 // Clean Architecture
 import 'shared/dependency_injection.dart';
@@ -83,6 +84,9 @@ void main() async {
   // Necessário para garantir que plugins (como SharedPreferences) sejam inicializados
   // antes de `runApp` se você usar `await` antes dele (como fizemos em AppPrefs).
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializa o serviço de notificações locais
+  await NotificationService.initialize();
 
   // Initialize Clean Architecture dependencies
   await initializeDependencies();
