@@ -193,14 +193,12 @@ class DocumentItemModel {
       stockItemId: json['stock_item_id'] ?? json['itemId'],
       stockItemName: json['stock_item_name'] ?? json['name'] ?? '',
     );
-  }
-  Map<String, dynamic> toJson() {
+  }  Map<String, dynamic> toJson() {
     return {
       if (id != null) 'id': id,
-      'stock_item_id': stockItemId, // Changed from 'itemId' to 'stock_item_id'
+      'itemId': stockItemId, // Backend expects 'itemId' field for validation
       'quantity': quantity,
-      'unit_price': unitValue,
-      'total_price': totalValue,
+      'unitPrice': unitValue, // Backend expects 'unitPrice' (legacy support for 'unit_price')
       'description': description,
     };
   }

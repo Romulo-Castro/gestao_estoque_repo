@@ -718,7 +718,6 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
       });
     }
   }
-
   void _showAddItemDialog() {
     _selectedStockItem = null;
     _quantityController.text = "1";
@@ -729,94 +728,98 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Adicionar Item'),
-          content: Form(
-            key: _addItemFormKey,
-            child: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildStockItemSelector(setDialogState),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _quantityController,
-                          decoration: const InputDecoration(
-                            labelText: 'Quantidade',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                          ],
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Digite a quantidade';
-                            }
-                            final quantity = double.tryParse(value);
-                            if (quantity == null || quantity <= 0) {
-                              return 'Quantidade inválida';
-                            }
-                            return null;
-                          },
-                          onChanged: (value) => setDialogState(() {}),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _priceController,
-                          decoration: const InputDecoration(
-                            labelText: 'Preço Unit.',
-                            border: OutlineInputBorder(),
-                            prefixText: 'R\$ ',
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                          ],
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Digite o preço';
-                            }
-                            final price = double.tryParse(value);
-                            if (price == null || price < 0) {
-                              return 'Preço inválido';
-                            }
-                            return null;
-                          },
-                          onChanged: (value) => setDialogState(() {}),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  if (_quantityController.text.isNotEmpty && _priceController.text.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Total:',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          Text(
-                            'R\$ ${_calculateItemTotal()}',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Form(
+                key: _addItemFormKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildStockItemSelector(setDialogState),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _quantityController,
+                            decoration: const InputDecoration(
+                              labelText: 'Quantidade',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             ),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                            ],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Digite a quantidade';
+                              }
+                              final quantity = double.tryParse(value);
+                              if (quantity == null || quantity <= 0) {
+                                return 'Quantidade inválida';
+                              }
+                              return null;
+                            },
+                            onChanged: (value) => setDialogState(() {}),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _priceController,
+                            decoration: const InputDecoration(
+                              labelText: 'Preço Unit.',
+                              border: OutlineInputBorder(),
+                              prefixText: 'R\$ ',
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                            ],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Digite o preço';
+                              }
+                              final price = double.tryParse(value);
+                              if (price == null || price < 0) {
+                                return 'Preço inválido';
+                              }
+                              return null;
+                            },
+                            onChanged: (value) => setDialogState(() {}),
+                          ),
+                        ),
+                      ],
                     ),
-                ],
+                    const SizedBox(height: 16),
+                    if (_quantityController.text.isNotEmpty && _priceController.text.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Total:',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            Text(
+                              'R\$ ${_calculateItemTotal()}',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -826,7 +829,7 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
-              onPressed: () => _updateItemInList(index),
+              onPressed: _addItem,
               child: const Text('Adicionar'),
             ),
           ],
@@ -834,7 +837,6 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
       ),
     );
   }
-
   Widget _buildStockItemSelector(StateSetter setDialogState) {
     return Consumer<StockProvider>(
       builder: (context, stockProvider, child) {
@@ -847,29 +849,38 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
           decoration: const InputDecoration(
             labelText: 'Item do Estoque',
             border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
           hint: const Text('Selecione um item'),
+          isExpanded: true, // Fix overflow by expanding the dropdown
           items: stockProvider.items.map((item) {
             return DropdownMenuItem(
               value: item,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  Text(
-                    'Estoque: ${item.quantity}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+              child: SizedBox(
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item.name,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
-                  ),
-                ],
+                    Text(
+                      'Estoque: ${item.quantity}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
-          }).toList(),          onChanged: (value) {
+          }).toList(),
+          onChanged: (value) {
             setDialogState(() {
               _selectedStockItem = value;
               if (value != null) {
@@ -901,11 +912,10 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
     // Format with comma for display
     return total.toStringAsFixed(2).replaceAll('.', ',');
   }
-
   void _addItem() {
     if (_addItemFormKey.currentState?.validate() ?? false) {
       final quantity = double.parse(_quantityController.text);
-      final unitValue = double.parse(_priceController.text);
+      final unitValue = double.parse(_priceController.text.replaceAll(',', '.'));
       
       final newItem = DocumentItemModel(
         quantity: quantity,
@@ -923,11 +933,10 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
       _showSnackBar('Item adicionado com sucesso!');
     }
   }
-
   void _updateItemInList(int index) {
     if (_addItemFormKey.currentState?.validate() ?? false) {
       final quantity = double.parse(_quantityController.text);
-      final unitValue = double.parse(_priceController.text);
+      final unitValue = double.parse(_priceController.text.replaceAll(',', '.'));
       final originalItem = _items[index]; // Get the original item
 
       int? newStockItemId;
@@ -964,7 +973,6 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
       _showSnackBar('Item atualizado com sucesso!');
     }
   }
-
   void _editItem(int index) {
     final item = _items[index];
     _selectedStockItem = null; 
@@ -989,90 +997,94 @@ class _RefactoredEditDocumentScreenState extends State<RefactoredEditDocumentScr
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Editar Item'),
-          content: Form(
-            key: _addItemFormKey, 
-            child: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildStockItemSelector(setDialogState),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _quantityController,
-                          decoration: const InputDecoration(
-                            labelText: 'Quantidade',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Digite a quantidade';
-                            }
-                            final quantity = int.tryParse(value);
-                            if (quantity == null || quantity <= 0) {
-                              return 'Quantidade inválida';
-                            }
-                            return null;
-                          },
-                          onChanged: (value) => setDialogState(() {}),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _priceController,
-                          decoration: const InputDecoration(
-                            labelText: 'Preço Unit.',
-                            border: OutlineInputBorder(),
-                            prefixText: 'R\$ ',
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\\d*[,.]?\\d{0,2}'))],
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Digite o preço';
-                            }
-                            final price = double.tryParse(value.replaceAll(',', '.'));
-                            if (price == null || price < 0) {
-                              return 'Preço inválido';
-                            }
-                            return null;
-                          },
-                          onChanged: (value) => setDialogState(() {}),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  if (_quantityController.text.isNotEmpty && _priceController.text.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Total:',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          Text(
-                            'R\$ ${_calculateItemTotal()}',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Form(
+                key: _addItemFormKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildStockItemSelector(setDialogState),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _quantityController,
+                            decoration: const InputDecoration(
+                              labelText: 'Quantidade',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             ),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Digite a quantidade';
+                              }
+                              final quantity = int.tryParse(value);
+                              if (quantity == null || quantity <= 0) {
+                                return 'Quantidade inválida';
+                              }
+                              return null;
+                            },
+                            onChanged: (value) => setDialogState(() {}),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _priceController,
+                            decoration: const InputDecoration(
+                              labelText: 'Preço Unit.',
+                              border: OutlineInputBorder(),
+                              prefixText: 'R\$ ',
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\\d*[,.]?\\d{0,2}'))],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Digite o preço';
+                              }
+                              final price = double.tryParse(value.replaceAll(',', '.'));
+                              if (price == null || price < 0) {
+                                return 'Preço inválido';
+                              }
+                              return null;
+                            },
+                            onChanged: (value) => setDialogState(() {}),
+                          ),
+                        ),
+                      ],
                     ),
-                ],
+                    const SizedBox(height: 16),
+                    if (_quantityController.text.isNotEmpty && _priceController.text.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Total:',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            Text(
+                              'R\$ ${_calculateItemTotal()}',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

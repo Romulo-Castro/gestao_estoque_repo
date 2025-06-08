@@ -6,7 +6,7 @@ import '../../data/models/balance_sheet_model.dart';
 import '../../domain/entities/document_entity.dart';
 import '../providers/document_provider.dart';
 import '../providers/store_provider.dart';
-import '../screens/edit_document_screen.dart';
+import '../screens/refactored_edit_document_screen.dart';
 import '../screens/document_detail_screen.dart';
 import '../widgets/app_drawer.dart';
 import '../../../shared/utils/logger.dart';
@@ -471,11 +471,10 @@ class _DocumentListScreenState extends State<DocumentListScreen>
           onPressed: _exportDocuments,
         ),
         IconButton(
-          icon: const Icon(Icons.add_box),
-          onPressed: () {
+          icon: const Icon(Icons.add_box),          onPressed: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (ctx) => const EditDocumentScreen(),
+                builder: (ctx) => const RefactoredEditDocumentScreen(),
               ),
             );
           },
@@ -845,11 +844,10 @@ class _DocumentListScreenState extends State<DocumentListScreen>
           default:
             // Para "TODOS", deixar o usuário escolher
             defaultType = null;
-            break;
-        }
+            break;        }
           Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (ctx) => EditDocumentScreen(defaultType: _stringToDocumentType(defaultType)),
+            builder: (ctx) => RefactoredEditDocumentScreen(defaultType: _stringToDocumentType(defaultType)),
           ),
         );
       },
