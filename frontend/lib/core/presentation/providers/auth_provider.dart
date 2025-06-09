@@ -21,7 +21,7 @@ class AuthProvider with ChangeNotifier, ErrorHandlingMixin {
   bool get isAuthenticated => _token != null && _user != null;
 
   Future<void> _loadStoredAuth() async {
-    final prefs = await SharedPreferences.getInstance();
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
     final storedToken = prefs.getString('auth_token');
     final storedUserJson = prefs.getString('user_data');
 

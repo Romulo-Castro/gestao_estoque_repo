@@ -8,7 +8,6 @@ class DocumentModel {
   final String description;
   final double totalValue;
   final String date;
-  final String status;
   final int storeId;
   final List<DocumentItemModel> items;
 
@@ -19,10 +18,10 @@ class DocumentModel {
     required this.description,
     required this.totalValue,
     required this.date,
-    required this.status,
     required this.storeId,
     required this.items,
   });
+  
   factory DocumentModel.fromJson(Map<String, dynamic> json) {
     // Map backend fields to frontend fields
     String mappedType = json['type'] ?? 'unknown';
@@ -39,7 +38,6 @@ class DocumentModel {
       description: json['description'] ?? json['notes'] ?? '',
       totalValue: (json['total_value'] ?? json['total_amount'] ?? 0.0).toDouble(),
       date: json['date'] ?? json['document_date'] ?? '',
-      status: json['status'] ?? 'ATIVO',
       storeId: json['store_id'] ?? 0,
       items: (json['items'] as List<dynamic>?)
               ?.map((item) => DocumentItemModel.fromJson(item))
@@ -47,6 +45,7 @@ class DocumentModel {
           [],
     );
   }
+  
   Map<String, dynamic> toJson() {
     // Map frontend fields to backend fields
     String mappedType = type;
@@ -66,7 +65,6 @@ class DocumentModel {
       'total_amount': totalValue, // Backend uses 'total_amount' field
       'date': date,
       'document_date': date, // Backend uses 'document_date' field
-      'status': status,
       'store_id': storeId,
       'items': items.map((item) => item.toJson()).toList(),
     };
@@ -80,7 +78,6 @@ class DocumentModel {
       description: description,
       totalValue: totalValue,
       date: _parseDate(date),
-      status: status,
       storeId: storeId,
       items: items.map((item) => item.toEntity()).toList(),
     );
@@ -94,7 +91,6 @@ class DocumentModel {
       description: entity.description,
       totalValue: entity.totalValue,
       date: entity.date.toIso8601String(),
-      status: entity.status,
       storeId: entity.storeId,
       items: entity.items.map((item) => DocumentItemModel.fromEntity(item)).toList(),
     );
@@ -142,7 +138,6 @@ class DocumentModel {
     String? description,
     double? totalValue,
     String? date,
-    String? status,
     int? storeId,
     List<DocumentItemModel>? items,
   }) {
@@ -153,7 +148,6 @@ class DocumentModel {
       description: description ?? this.description,
       totalValue: totalValue ?? this.totalValue,
       date: date ?? this.date,
-      status: status ?? this.status,
       storeId: storeId ?? this.storeId,
       items: items ?? this.items,
     );

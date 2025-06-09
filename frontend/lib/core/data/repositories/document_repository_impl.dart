@@ -44,17 +44,6 @@ class DocumentRepositoryImpl implements DocumentRepository {
   }
 
   @override
-  Future<DocumentEntity> updateDocument(DocumentEntity document) async {
-    try {
-      final model = DocumentModel.fromEntity(document);
-      final updatedModel = await _remoteDataSource.updateDocument(model);
-      return updatedModel.toEntity();
-    } catch (e) {
-      throw DocumentRepositoryException('Failed to update document: $e');
-    }
-  }
-
-  @override
   Future<void> deleteDocument(int documentId) async {
     try {
       await _remoteDataSource.deleteDocument(documentId);
@@ -104,9 +93,9 @@ class DocumentRepositoryImpl implements DocumentRepository {
         period.endDate,
       );
 
-      // Filter documents by period and active status
+      // Filter documents by period
       final filteredDocuments = documents.where((doc) {
-        return period.contains(doc.date) && !doc.isCancelled;
+        return period.contains(doc.date);
       }).toList();
 
       return BalanceSheetEntity.fromDocuments(filteredDocuments);
@@ -130,9 +119,8 @@ class DocumentRepositoryImpl implements DocumentRepository {
     try {
       final documents = await getDocuments(storeId);
       
-      final activeDocuments = documents.where((doc) => !doc.isCancelled).toList();
-      final inflows = activeDocuments.where((doc) => doc.isInflow).toList();
-      final outflows = activeDocuments.where((doc) => doc.isOutflow).toList();
+      final inflows = documents.where((doc) => doc.isInflow).toList();
+      final outflows = documents.where((doc) => doc.isOutflow).toList();
       
       final totalInflowValue = inflows.fold<double>(
         0.0, 
@@ -145,7 +133,7 @@ class DocumentRepositoryImpl implements DocumentRepository {
       );
 
       return DocumentStatistics(
-        totalDocuments: activeDocuments.length,
+        totalDocuments: documents.length,
         totalInflows: inflows.length,
         totalOutflows: outflows.length,
         totalInflowValue: totalInflowValue,

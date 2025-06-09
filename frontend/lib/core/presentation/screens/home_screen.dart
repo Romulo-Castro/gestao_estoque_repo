@@ -407,7 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         iconColor: Colors.green[700],
                         onTap: () => Navigator.pushNamed(
                           context, 
-                          AppRoutes.editDocument, 
+                          AppRoutes.createDocument, 
                           arguments: {'type': 'ENTRADA'}
                         ),
                       ),
@@ -421,7 +421,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         iconColor: Colors.redAccent[700],
                         onTap: () => Navigator.pushNamed(
                           context, 
-                          AppRoutes.editDocument, 
+                          AppRoutes.createDocument, 
                           arguments: {'type': 'SAIDA'}
                         ),
                       ),

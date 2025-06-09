@@ -10,7 +10,6 @@ class DocumentEntity extends Equatable {
   final String description;
   final double totalValue;
   final DateTime date;
-  final String status;
   final int storeId;
   final List<DocumentItemEntity> items;
 
@@ -21,7 +20,6 @@ class DocumentEntity extends Equatable {
     required this.description,
     required this.totalValue,
     required this.date,
-    required this.status,
     required this.storeId,
     required this.items,
   });
@@ -34,7 +32,6 @@ class DocumentEntity extends Equatable {
         description,
         totalValue,
         date,
-        status,
         storeId,
         items,
       ];
@@ -46,7 +43,6 @@ class DocumentEntity extends Equatable {
     String? description,
     double? totalValue,
     DateTime? date,
-    String? status,
     int? storeId,
     List<DocumentItemEntity>? items,
   }) {
@@ -57,7 +53,6 @@ class DocumentEntity extends Equatable {
       description: description ?? this.description,
       totalValue: totalValue ?? this.totalValue,
       date: date ?? this.date,
-      status: status ?? this.status,
       storeId: storeId ?? this.storeId,
       items: items ?? this.items,
     );
@@ -65,8 +60,6 @@ class DocumentEntity extends Equatable {
 
   bool get isInflow => type == DocumentType.entrada;
   bool get isOutflow => type == DocumentType.saida;
-  bool get isCancelled => status == 'CANCELADO';
-  bool get isActive => !isCancelled;
 }
 
 class DocumentItemEntity extends Equatable {

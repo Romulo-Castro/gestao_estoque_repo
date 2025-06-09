@@ -111,7 +111,7 @@ class SimpleReportService {
       final formattedDate = docDate != null ? _dateFormat.format(docDate) : doc.date;
       final type = doc.type;
       
-      buffer.writeln('${_padString(doc.id?.toString() ?? 'N/A', 8)} ${_padString(type, 12)} ${_padString(formattedDate, 12)} ${_padString(doc.status, 12)}');
+      buffer.writeln('${_padString(doc.id?.toString() ?? 'N/A', 8)} ${_padString(type, 12)} ${_padString(formattedDate, 12)} ${_padString('ATIVO', 12)}'); // Default status since status field was removed
     }
 
     buffer.writeln('-'.padLeft(80, '-'));

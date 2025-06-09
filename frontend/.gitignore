@@ -46,3 +46,44 @@ pubspec.lock
 **/linux/flutter/ephemeral/
 **/macos/Flutter/ephemeral/
 **/windows/flutter/ephemeral/
+
+# Additional Flutter/Dart ignores
+.fvm/
+.dart_tool/
+**/.dart_tool/
+coverage/
+test/coverage/
+.test_coverage/
+
+# Flutter web build
+web/build/
+
+# Flutter Windows build
+windows/flutter/CMakeFiles/
+windows/flutter/cmake_install.cmake
+windows/flutter/CMakeCache.txt
+
+# Flutter Linux build  
+linux/flutter/CMakeFiles/
+linux/flutter/cmake_install.cmake
+linux/flutter/CMakeCache.txt
+
+# Flutter macOS build
+macos/Flutter/ephemeral/
+macos/build/
+
+# Keystore files
+**/*.keystore
+**/*.jks
+key.properties
+keystore.properties
+
+# Firebase and Google Services
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+
+# Environment variables
+.env
+.env.local
+.env.production

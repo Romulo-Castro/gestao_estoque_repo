@@ -11,6 +11,9 @@ class StoreProvider with ChangeNotifier, ErrorHandlingMixin {
   Store? _selectedStore;
   bool _hasFetchedStores = false; // Flag para saber se já buscou lojas
 
+  // Adicionado getter para ApiService
+  ApiService get apiService => _apiService;
+
   List<Store> get stores => _stores;
   Store? get selectedStore => _selectedStore;
   int? get selectedStoreId => _selectedStore?.id;

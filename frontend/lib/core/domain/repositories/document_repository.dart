@@ -12,9 +12,6 @@ abstract class DocumentRepository {
   /// Create a new document
   Future<DocumentEntity> createDocument(DocumentEntity document);
   
-  /// Update an existing document
-  Future<DocumentEntity> updateDocument(DocumentEntity document);
-  
   /// Delete a document
   Future<void> deleteDocument(int documentId);
   

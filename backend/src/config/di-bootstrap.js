@@ -23,7 +23,6 @@ const { DeleteStockItem } = require('../core/application/usecases/stock/delete-s
 const GetDocuments = require('../core/application/usecases/documents/get-documents');
 const CalculateBalanceSheet = require('../core/application/usecases/documents/calculate-balance-sheet');
 const CreateDocument = require('../core/application/usecases/documents/create-document');
-const UpdateDocument = require('../core/application/usecases/documents/update-document');
 const CancelDocument = require('../core/application/usecases/documents/cancel-document');
 
 // Application Use Cases - Customers
@@ -110,15 +109,9 @@ class DIBootstrap {    static setupContainer() {
 
         container.register('calculateBalanceSheet', (documentRepository, balanceCalculator) => {
             return new CalculateBalanceSheet(documentRepository, balanceCalculator);
-        }, { dependencies: ['documentRepository', 'balanceCalculator'] });
-
-        container.register('createDocument', (documentRepository, stockRepository, customerRepository, supplierRepository) => {
+        }, { dependencies: ['documentRepository', 'balanceCalculator'] });        container.register('createDocument', (documentRepository, stockRepository, customerRepository, supplierRepository) => {
             return new CreateDocument(documentRepository, stockRepository, customerRepository, supplierRepository);
         }, { dependencies: ['documentRepository', 'stockRepository', 'customerRepository', 'supplierRepository'] });
-
-        container.register('updateDocument', (documentRepository, customerRepository, supplierRepository) => {
-            return new UpdateDocument(documentRepository, customerRepository, supplierRepository);
-        }, { dependencies: ['documentRepository', 'customerRepository', 'supplierRepository'] });
 
         container.register('cancelDocument', (documentRepository, stockRepository) => {
             return new CancelDocument(documentRepository, stockRepository);

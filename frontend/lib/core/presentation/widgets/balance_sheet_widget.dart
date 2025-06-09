@@ -1,8 +1,10 @@
+// Balance Sheet Widget with Clean Architecture support
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../data/models/document_model.dart';
 import '../../data/models/balance_sheet_model.dart';
+import '../../data/models/document_model.dart';
 import '../../domain/entities/document_entity.dart';
+import '../../../shared/utils/logger.dart';
 
 class BalanceSheetWidget extends StatefulWidget {
   final List<DocumentModel> documents;
@@ -32,28 +34,101 @@ class _BalanceSheetWidgetState extends State<BalanceSheetWidget> {
   @override
   void initState() {
     super.initState();
-    _calculateBalance();
+    _updateBalanceData();
   }
-  void _calculateBalance() {
-    final filteredDocuments = widget.documents.where((doc) {
-      if (doc.date.isEmpty) return false;
+
+  @override
+  void didUpdateWidget(BalanceSheetWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.documents != widget.documents) {
+      _updateBalanceData();
+    }
+  }
+
+  void _updateBalanceData() {    
+    AppLogger.info('Starting balance calculation', 'BalanceSheetWidget');
+    AppLogger.info('Total documents received: ${widget.documents.length}', 'BalanceSheetWidget');
+    
+    if (widget.documents.isEmpty) {
+      AppLogger.warning('No documents available', 'BalanceSheetWidget');
+      setState(() {
+        _balanceData = BalanceSheetData.empty();
+      });
+      return;
+    }    // Filter and validate documents
+    final validDocuments = <DocumentModel>[];
+    for (final doc in widget.documents) {
+      // Note: Status field was removed from documents - all documents are considered active
+      
+      if (doc.date.isEmpty) {
+        AppLogger.warning('Document ${doc.number} has empty date - skipping', 'BalanceSheetWidget');
+        continue;
+      }
+
       try {
         final docDate = DateTime.parse(doc.date);
-        return _selectedPeriod.contains(docDate);
-      } catch (e) {
-        return false;
+        final isInPeriod = _selectedPeriod.contains(docDate);        
+        AppLogger.debug('Document ${doc.number}: '
+              'type=${doc.type}, date=${doc.date}, value=${doc.totalValue}, '
+              'inPeriod=$isInPeriod', 'BalanceSheetWidget');
+        
+        if (isInPeriod) {
+          validDocuments.add(doc);
+        }
+      } catch (e) {        
+        AppLogger.error('Failed to parse date for document ${doc.number}: '
+              '${doc.date}', 'BalanceSheetWidget', e);
       }
-    }).toList();
+    }
 
-    _balanceData = BalanceSheetData.fromDocuments(filteredDocuments);
+    AppLogger.info('Valid documents for calculation: ${validDocuments.length}', 'BalanceSheetWidget');
+
+    // Calculate balance using both current and improved logic
+    setState(() {
+      _balanceData = BalanceSheetData.fromDocuments(validDocuments);
+      
+      // Enhanced calculation validation
+      double totalInflows = 0.0;
+      double totalOutflows = 0.0;
+      int inflowCount = 0;
+      int outflowCount = 0;      for (final doc in validDocuments) {
+        if (doc.type == 'entrada') {
+          totalInflows += doc.totalValue;
+          inflowCount++;
+          AppLogger.debug('Adding inflow: ${doc.number} = ${doc.totalValue}', 'BalanceSheetWidget');
+        } else if (doc.type == 'saida') {
+          totalOutflows += doc.totalValue;
+          outflowCount++;
+          AppLogger.debug('Adding outflow: ${doc.number} = ${doc.totalValue}', 'BalanceSheetWidget');
+        }
+      }
+
+      final netBalance = totalInflows - totalOutflows;
+        AppLogger.info('Manual calculation:', 'BalanceSheetWidget');
+      AppLogger.info('  - Total Inflows: $totalInflows (count: $inflowCount)', 'BalanceSheetWidget');
+      AppLogger.info('  - Total Outflows: $totalOutflows (count: $outflowCount)', 'BalanceSheetWidget');
+      AppLogger.info('  - Net Balance: $netBalance', 'BalanceSheetWidget');
+        AppLogger.info('BalanceSheetData calculation:', 'BalanceSheetWidget');
+      AppLogger.info('  - Total Inflows: ${_balanceData.totalInflows}', 'BalanceSheetWidget');
+      AppLogger.info('  - Total Outflows: ${_balanceData.totalOutflows}', 'BalanceSheetWidget');
+      AppLogger.info('  - Net Balance: ${_balanceData.netBalance}', 'BalanceSheetWidget');
+      
+      // Verify calculations match
+      if ((totalInflows - _balanceData.totalInflows).abs() > 0.01 ||
+          (totalOutflows - _balanceData.totalOutflows).abs() > 0.01) {
+        AppLogger.warning('WARNING: Calculation mismatch detected!', 'BalanceSheetWidget');
+      } else {
+        AppLogger.info('Calculations verified - all correct', 'BalanceSheetWidget');
+      }
+    });
   }
-
   void _onPeriodChanged(BalanceSheetPeriod? period) {
     if (period != null && period != _selectedPeriod) {
+      AppLogger.info('Period changed to: ${period.displayName}', 'BalanceSheetWidget');
       setState(() {
         _selectedPeriod = period;
       });
-      _calculateBalance();
+      _updateBalanceData();
     }
   }
 
@@ -62,7 +137,7 @@ class _BalanceSheetWidgetState extends State<BalanceSheetWidget> {
     return Column(
       children: [
         _buildPeriodSelector(),
-        _buildSummaryCards(),
+        _buildEnhancedSummaryCards(),
         const SizedBox(height: 16),
         Expanded(child: _buildDetailedView()),
       ],
@@ -102,87 +177,71 @@ class _BalanceSheetWidgetState extends State<BalanceSheetWidget> {
               }).toList(),
             ),
           ),
-          if (widget.onExportBalanceSheet != null)
-            IconButton(
-              icon: const Icon(Icons.file_download),
-              onPressed: widget.onExportBalanceSheet,
-              tooltip: 'Exportar Balancete',
-            ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryCards() {
-    final currencyFormat = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+  Widget _buildEnhancedSummaryCards() {
+    final formatter = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
     
     return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
+      padding: const EdgeInsets.all(16),      child: Column(
         children: [
+          // Financial summary cards
           Row(
             children: [
               Expanded(
-                child: _buildSummaryCard(
-                  title: 'Entradas',
-                  value: currencyFormat.format(_balanceData.totalInflows),
-                  count: '${_balanceData.inflowCount} documentos',
-                  color: Colors.green,
-                  icon: Icons.trending_up,
+                child: _buildSummaryCard(                  'Entradas',
+                  formatter.format(_balanceData.totalInflows),
+                  Colors.green,
+                  Icons.trending_up,
+                  '${_balanceData.inflowCount} documento(s)',
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: _buildSummaryCard(
-                  title: 'Saídas',
-                  value: currencyFormat.format(_balanceData.totalOutflows),
-                  count: '${_balanceData.outflowCount} documentos',
-                  color: Colors.red,
-                  icon: Icons.trending_down,
+                  'Saídas',
+                  formatter.format(_balanceData.totalOutflows),
+                  Colors.red,
+                  Icons.trending_down,
+                  '${_balanceData.outflowCount} documento(s)',
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
           _buildSummaryCard(
-            title: 'Saldo Líquido',
-            value: currencyFormat.format(_balanceData.netBalance),
-            count: _balanceData.netBalance >= 0 ? 'Resultado Positivo' : 'Resultado Negativo',
-            color: _balanceData.netBalance >= 0 ? Colors.blue : Colors.orange,
-            icon: _balanceData.netBalance >= 0 ? Icons.account_balance : Icons.warning,
-            isWide: true,
+            'Saldo Líquido',
+            formatter.format(_balanceData.netBalance),
+            _balanceData.netBalance >= 0 ? Colors.green : Colors.red,
+            _balanceData.netBalance >= 0 ? Icons.account_balance : Icons.warning,
+            _balanceData.netBalance >= 0 ? 'Positivo' : 'Negativo',
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryCard({
-    required String title,
-    required String value,
-    required String count,
-    required Color color,
-    required IconData icon,
-    bool isWide = false,
-  }) {
+  Widget _buildSummaryCard(String title, String value, Color color, IconData icon, String subtitle) {
     return Card(
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: isWide ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: isWide ? MainAxisAlignment.center : MainAxisAlignment.start,
               children: [
                 Icon(icon, color: color, size: 24),
                 const SizedBox(width: 8),
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: color,
+                    color: Colors.grey[700],
                   ),
                 ),
               ],
@@ -191,20 +250,17 @@ class _BalanceSheetWidgetState extends State<BalanceSheetWidget> {
             Text(
               value,
               style: TextStyle(
-                fontSize: isWide ? 24 : 20,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
-              textAlign: isWide ? TextAlign.center : TextAlign.start,
             ),
-            const SizedBox(height: 4),
             Text(
-              count,
+              subtitle,
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey[600],
               ),
-              textAlign: isWide ? TextAlign.center : TextAlign.start,
             ),
           ],
         ),
@@ -213,52 +269,15 @@ class _BalanceSheetWidgetState extends State<BalanceSheetWidget> {
   }
 
   Widget _buildDetailedView() {
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          TabBar(
-            labelColor: Colors.blue[700],
-            unselectedLabelColor: Colors.grey[600],
-            indicatorColor: Colors.blue[700],
-            tabs: [
-              Tab(
-                icon: const Icon(Icons.trending_up),
-                text: 'Entradas (${_balanceData.inflowCount})',
-              ),
-              Tab(
-                icon: const Icon(Icons.trending_down),
-                text: 'Saídas (${_balanceData.outflowCount})',
-              ),
-            ],
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _buildItemsList(_balanceData.inflowItems, Colors.green),
-                _buildItemsList(_balanceData.outflowItems, Colors.red),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildItemsList(List<BalanceSheetItem> items, Color accentColor) {
-    if (items.isEmpty) {
+    if (_balanceData.inflowItems.isEmpty && _balanceData.outflowItems.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.inbox_outlined,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.inbox, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
-              'Nenhum documento encontrado',
+              'Nenhum documento encontrado para o período selecionado',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
@@ -269,67 +288,90 @@ class _BalanceSheetWidgetState extends State<BalanceSheetWidget> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return _buildBalanceSheetItem(item, accentColor);
-      },
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          TabBar(
+            labelColor: Colors.blue,
+            unselectedLabelColor: Colors.grey,
+            tabs: [
+              Tab(
+                text: 'Entradas (${_balanceData.inflowCount})',
+                icon: const Icon(Icons.trending_up),
+              ),
+              Tab(
+                text: 'Saídas (${_balanceData.outflowCount})',
+                icon: const Icon(Icons.trending_down),
+              ),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildDocumentList(_balanceData.inflowItems, Colors.green),
+                _buildDocumentList(_balanceData.outflowItems, Colors.red),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildBalanceSheetItem(BalanceSheetItem item, Color accentColor) {
-    final currencyFormat = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
-    final dateFormat = DateFormat('dd/MM/yyyy');
+  Widget _buildDocumentList(List<BalanceSheetItem> items, Color color) {
+    if (items.isEmpty) {
+      return Center(
+        child: Text(
+          'Nenhum documento encontrado',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+      );
+    }
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: accentColor.withOpacity(0.1),
-          child: Icon(
-            _getDocumentIcon(item.type),
-            color: accentColor,
-            size: 20,
-          ),
-        ),
-        title: Text(
-          'Doc. ${item.documentNumber}',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(item.description),
-            Text(
-              '${dateFormat.format(item.date)} • ${item.itemCount} itens',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+    return ListView.builder(
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: ListTile(            leading: CircleAvatar(
+              backgroundColor: color.withOpacity(0.1),              child: Icon(
+                item.type == DocumentType.entrada 
+                    ? Icons.trending_up 
+                    : Icons.trending_down,
+                color: color,
               ),
             ),
-          ],
-        ),
-        trailing: Text(
-          currencyFormat.format(item.value),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: accentColor,
-            fontSize: 16,
+            title: Text(
+              'Doc. ${item.documentNumber}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.description),
+                Text(
+                  DateFormat('dd/MM/yyyy').format(item.date),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+            trailing: Text(
+              NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                  .format(item.value),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontSize: 16,
+              ),
+            ),
           ),
-        ),
-        isThreeLine: true,
-      ),
+        );
+      },
     );
-  }  IconData _getDocumentIcon(DocumentType type) {
-    switch (type) {
-      case DocumentType.entrada:
-        return Icons.input;
-      case DocumentType.saida:
-        return Icons.output;
-      case DocumentType.unknown:
-        return Icons.help_outline;
-    }
   }
 }

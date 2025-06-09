@@ -49,7 +49,7 @@ class BalanceSheetEntity extends Equatable {
     DateTime? latestDate;
 
     for (final document in documents) {
-      if (document.isCancelled) continue;
+      // Removed isCancelled check since status field no longer exists
       
       // Update date range
       if (earliestDate == null || document.date.isBefore(earliestDate)) {

@@ -192,11 +192,8 @@ exports.cancelDocument = catchAsync(async (req, res, next) => {
             // A quantidade a reverter é o OPOSTO do ajuste original
             const quantityToReverse = (document.type === "purchase") ? -item.quantity : item.quantity;
             await db.updateStockQuantity(item.item_id, storeId, quantityToReverse);
-        }
-
-        // 3. Marcar o documento como cancelado (ou deletar, se preferir - menos seguro)
-        // await db.deleteDocumentAndItems(documentId, storeId); // Opção 1: Deletar
-        await db.updateDocumentStatus(documentId, storeId, "CANCELADO"); // Opção 2: Marcar como cancelado
+        }        // 3. Delete the document completely (since status field no longer exists)
+        await db.deleteDocumentAndItems(documentId, storeId); // Delete the document and its items
 
         await db.commitTransaction();
 

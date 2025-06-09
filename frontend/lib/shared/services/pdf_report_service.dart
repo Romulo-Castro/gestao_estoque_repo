@@ -252,7 +252,7 @@ class PdfReportService {
     final totalDocs = documents.length;
     final entraDocs = documents.where((d) => d.type == 'entrada').length;
     final saidaDocs = documents.where((d) => d.type == 'saida').length;
-    final processedDocs = documents.where((d) => d.status == 'PROCESSED').length;
+    // Removed processedDocs since status field no longer exists
 
     return pw.Container(
       padding: const pw.EdgeInsets.all(16),
@@ -266,7 +266,7 @@ class PdfReportService {
           _buildSummaryItem('Total', totalDocs.toString()),
           _buildSummaryItem('Entradas', entraDocs.toString()),
           _buildSummaryItem('Saídas', saidaDocs.toString()),
-          _buildSummaryItem('Processados', processedDocs.toString()),
+          // Removed processedDocs since status field no longer exists
         ],
       ),
     );
@@ -301,7 +301,7 @@ class PdfReportService {
             _buildTableCell(doc.type),
             _buildTableCell(doc.date),
             _buildTableCell(doc.items.length.toString()),
-            _buildTableCell(doc.status),
+            _buildTableCell('ATIVO'), // Default status since status field was removed
           ],
         )),
       ],

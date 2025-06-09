@@ -22,7 +22,7 @@ class GetBalanceSheetUseCase {
 
       // Filter documents based on the period
       final filteredDocuments = documents.where((doc) {
-        return period.contains(doc.date) && !doc.isCancelled;
+        return period.contains(doc.date);
       }).toList();
 
       // Calculate balance sheet from filtered documents
@@ -43,7 +43,7 @@ class GetBalanceSheetUseCase {
     BalanceSheetPeriodEntity period,
   ) {
     return documents.where((doc) {
-      return period.contains(doc.date) && !doc.isCancelled;
+      return period.contains(doc.date);
     }).toList();
   }
 }

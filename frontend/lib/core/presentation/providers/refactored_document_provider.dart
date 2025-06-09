@@ -129,43 +129,6 @@ class RefactoredDocumentProvider with ChangeNotifier, ErrorHandlingMixin {
     }
     
     return result;
-  }  /// Update an existing document
-  Future<DocumentModel> updateDocument(DocumentModel document) async {
-    final result = await handleAsyncOperation(() async {
-      _isSaving = true;
-      notifyListeners();
-
-      try {
-        debugPrint("[RefactoredDocumentProvider] Atualizando documento: ${document.id}");
-        
-        final updatedDocument = await _apiService.updateDocument(_storeId!, document.id!, document);
-        
-        // Update in local list
-        final index = _documents.indexWhere((doc) => doc.id == updatedDocument.id);
-        if (index != -1) {
-          _documents[index] = updatedDocument;
-        }
-        
-        _currentDocument = updatedDocument;
-        
-        debugPrint("[RefactoredDocumentProvider] Documento atualizado: ${updatedDocument.number}");
-        
-        return updatedDocument;
-      } catch (e) {
-        debugPrint("[RefactoredDocumentProvider] Erro ao atualizar documento: $e");
-        setError('Erro ao atualizar documento: $e', 'updateDocument');
-        rethrow;
-      } finally {
-        _isSaving = false;
-        notifyListeners();
-      }
-    }, 'updateDocument');
-    
-    if (result == null) {
-      throw Exception('Falha ao atualizar documento');
-    }
-    
-    return result;
   }
   /// Delete a document
   Future<void> deleteDocument(int documentId) async {

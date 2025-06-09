@@ -45,11 +45,6 @@ class SQLiteDocumentRepository {
             params.push(filters.supplierId);
         }
 
-        if (filters.status) {
-            sql += ' AND d.status = ?';
-            params.push(filters.status);
-        }
-
         sql += ' ORDER BY d.document_date DESC, d.created_at DESC';
 
         const rows = await this.db.all(sql, params);
@@ -111,7 +106,6 @@ class SQLiteDocumentRepository {
             total_amount: document.totalAmount ? document.totalAmount.amount : 0,
             currency: document.totalAmount ? document.totalAmount.currency : 'BRL',
             notes: document.notes,
-            status: document.status,
             created_at: document.createdAt.toISOString(),
             updated_at: new Date().toISOString()
         };
@@ -122,14 +116,14 @@ class SQLiteDocumentRepository {
                 UPDATE documents 
                 SET type = ?, document_number = ?, document_date = ?, 
                     customer_id = ?, supplier_id = ?, total_amount = ?, 
-                    currency = ?, notes = ?, status = ?, updated_at = ?
+                    currency = ?, notes = ?, updated_at = ? 
                 WHERE id = ? AND store_id = ?
             `;
             
             const result = await this.db.run(sql, [
                 data.type, data.document_number, data.document_date,
                 data.customer_id, data.supplier_id, data.total_amount,
-                data.currency, data.notes, data.status, data.updated_at,
+                data.currency, data.notes, data.updated_at,
                 document.id, data.store_id
             ]);
             
@@ -139,14 +133,14 @@ class SQLiteDocumentRepository {
             const sql = `
                 INSERT INTO documents 
                 (store_id, type, document_number, document_date, customer_id, 
-                 supplier_id, total_amount, currency, notes, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 supplier_id, total_amount, currency, notes, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
             `;
             
             const result = await this.db.run(sql, [
                 data.store_id, data.type, data.document_number, data.document_date,
                 data.customer_id, data.supplier_id, data.total_amount,
-                data.currency, data.notes, data.status, data.created_at, data.updated_at
+                data.currency, data.notes, data.created_at, data.updated_at
             ]);
             
             document.id = result.lastID;
@@ -187,23 +181,6 @@ class SQLiteDocumentRepository {
         // SQLite will handle cascade deletes for document_items
         const sql = `DELETE FROM documents WHERE id = ? AND store_id = ?`;
         const result = await this.db.run(sql, [documentId, storeId]);
-        return result.changes > 0;
-    }
-
-    async updateStatus(documentId, storeId, newStatus) {
-        const sql = `
-            UPDATE documents 
-            SET status = ?, updated_at = ?
-            WHERE id = ? AND store_id = ?
-        `;
-        
-        const result = await this.db.run(sql, [
-            newStatus,
-            new Date().toISOString(),
-            documentId,
-            storeId
-        ]);
-        
         return result.changes > 0;
     }
 
@@ -263,10 +240,10 @@ class SQLiteDocumentRepository {
         try {
             await this.db.run('BEGIN TRANSACTION');
 
-            // Update document status to cancelled
-            const statusUpdated = await this.updateStatus(documentId, storeId, 'CANCELADO');
-            if (!statusUpdated) {
-                throw new Error('Documento não encontrado');
+            // Delete the document
+            const deleted = await this.delete(documentId, storeId);
+            if (!deleted) {
+                throw new Error('Documento não encontrado ou já removido');
             }
 
             // Apply stock reversals if provided
@@ -278,7 +255,9 @@ class SQLiteDocumentRepository {
             }
 
             await this.db.run('COMMIT');
-            return await this.findByIdAndStore(documentId, storeId);
+            // Since the document is deleted, we don't return it. 
+            // The use case can return a success message or the ID.
+            return { id: documentId, cancelled: true }; 
         } catch (error) {
             await this.db.run('ROLLBACK');
             throw error;
@@ -377,7 +356,6 @@ class SQLiteDocumentRepository {
             supplierId: row.supplier_id,
             totalAmount: new Money(row.total_amount || 0, row.currency || 'BRL'),
             notes: row.notes,
-            status: row.status,
             createdAt: new Date(row.created_at),
             updatedAt: new Date(row.updated_at),
             // Additional joined data

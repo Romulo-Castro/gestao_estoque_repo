@@ -8,16 +8,17 @@ import '../../core/data/datasources/api_service.dart';
 import '../utils/logger.dart';
 
 class BulkImportService {
-  final ApiService _apiService = ApiService();
+  final ApiService _apiService; // Modificado para receber ApiService
+
+  // Construtor modificado para aceitar ApiService
+  BulkImportService(this._apiService);
 
   /// Importa mercadorias de um arquivo CSV
   Future<ImportResult> importFromCsv(File file, int storeId) async {
+    AppLogger.info('Iniciando importação CSV', 'BulkImportService');
     try {
-      AppLogger.info('Iniciando importação CSV', 'BulkImportService');
-      final content = await file.readAsString();
-      final List<List<dynamic>> rows = const CsvToListConverter().convert(content);
-      
-      if (rows.isEmpty) {
+      final csvString = await file.readAsString();
+      if (csvString.trim().isEmpty) {
         return ImportResult(
           totalRows: 0,
           successCount: 0,
@@ -27,14 +28,36 @@ class BulkImportService {
         );
       }
 
+      // Normalize line endings to \n before parsing
+      final normalizedCsvString = csvString.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+
+      final List<List<dynamic>> rows =
+          const CsvToListConverter(eol: '\n', fieldDelimiter: ',')
+              .convert(normalizedCsvString);
+
+      AppLogger.debug('CSV parsing produced ${rows.length} rows after normalization.', 'BulkImportService');
+      if (rows.isNotEmpty) {
+        AppLogger.debug('First row content (after normalization): ${rows.first}', 'BulkImportService');
+      }
+
+      if (rows.isEmpty || rows.length <= 1) { // Ensure there are data rows beyond a potential header
+        AppLogger.warning('CSV has no data rows after normalization. Total rows: ${rows.length}', 'BulkImportService');
+        return ImportResult(
+            totalRows: 0,
+            successCount: 0,
+            errorCount: 1,
+            errors: ['Arquivo CSV não contém dados (apenas cabeçalho ou vazio)'],
+            warnings: []);
+      }
       return await _processRows(rows, storeId);
-    } catch (e) {
-      AppLogger.error('Erro ao ler arquivo CSV: $e', 'BulkImportService');
+    } catch (e, s) {
+      // Assuming AppLogger.error can take an error object and stacktrace
+      AppLogger.error('Erro ao importar CSV: $e', 'BulkImportService', e, s);
       return ImportResult(
-        totalRows: 0,
+        totalRows: 0, // Or attempt to count rows if possible before error
         successCount: 0,
-        errorCount: 1,
-        errors: ['Erro ao ler arquivo CSV: $e'],
+        errorCount: 1, // Or more, depending on how row count is determined
+        errors: ['Erro ao processar arquivo CSV: $e'],
         warnings: [],
       );
     }
@@ -185,8 +208,9 @@ class BulkImportService {
       
       try {
         final merchandise = _parseRowToMerchandise(row, rowIndex);
-        if (merchandise == null) {
+        if (merchandise == null) { // Should not happen with current _parseRowToMerchandise logic if row is not empty
           errorCount++;
+          errors.add('Linha $rowIndex: Linha vazia ou inválida (retorno nulo do parser)');
           continue;
         }
 
@@ -202,14 +226,25 @@ class BulkImportService {
           updatedAt: now,
         );
 
+        // NOTE: In a real scenario, ensure ApiService is mocked for unit tests
+        // For this specific test ('Import service validates required fields'),
+        // this line should not be reached if _parseRowToMerchandise throws.
         await _apiService.createStockItem(storeId, stockItem);
         successCount++;
         AppLogger.debug('Item importado: ${merchandise.name}', 'BulkImportService');
         
       } catch (e) {
         errorCount++;
-        errors.add('Linha $rowIndex: Erro ao importar - $e');
-        AppLogger.warning('Erro na linha $rowIndex: $e', 'BulkImportService');
+        String errorMessage = e.toString();
+        if (e is Exception) {
+          // Remove "Exception: " prefix if present
+          errorMessage = errorMessage.replaceFirst(RegExp(r'^Exception: '), '');
+        }
+        // Ensure the error message from _parseRowToMerchandise (which might already contain "Linha X: ")
+        // isn't re-prefixed if it's a direct pass-through.
+        // Porém, _parseRowToMerchandise foi alterado para lançar mensagens simples.
+        errors.add('Linha $rowIndex: $errorMessage');
+        AppLogger.warning('Erro na linha $rowIndex ($errorMessage): $e', 'BulkImportService');
       }
     }
 
@@ -225,47 +260,42 @@ class BulkImportService {
 
   /// Converte uma linha do arquivo em dados de mercadoria
   ImportMerchandiseData? _parseRowToMerchandise(List<dynamic> row, int rowIndex) {
-    if (row.isEmpty) return null;
-
-    try {
-      // Formato esperado das colunas:
-      // 0: Nome, 1: Quantidade, 2: Código de Barras, 3: Categoria, 4: Descrição,
-      // 5: Preço de Custo, 6: Preço de Venda, 7: Unidade, 8: Fornecedor, 9: Localização, 10: Observações
-
-      final name = _getCellValue(row, 0)?.toString().trim();
-      if (name == null || name.isEmpty) {
-        throw Exception('Nome é obrigatório');
-      }
-
-      final quantityStr = _getCellValue(row, 1)?.toString().trim();
-      if (quantityStr == null || quantityStr.isEmpty) {
-        throw Exception('Quantidade é obrigatória');
-      }
-
-      final quantity = double.tryParse(quantityStr);
-      if (quantity == null || quantity < 0) {
-        throw Exception('Quantidade deve ser um número válido >= 0');
-      }
-
-      return ImportMerchandiseData(
-        name: name,
-        quantity: quantity,
-        barcode: _getCellValue(row, 2)?.toString().trim(),
-        category: _getCellValue(row, 3)?.toString().trim(),
-        description: _getCellValue(row, 4)?.toString().trim(),
-        costPrice: _parseDouble(_getCellValue(row, 5)),
-        salePrice: _parseDouble(_getCellValue(row, 6)),
-        unit: _getCellValue(row, 7)?.toString().trim(),
-        supplier: _getCellValue(row, 8)?.toString().trim(),
-        location: _getCellValue(row, 9)?.toString().trim(),
-        notes: _getCellValue(row, 10)?.toString().trim(),
-      );
-    } catch (e) {
-      throw Exception('Linha $rowIndex: $e');
+    // Validate Nome (Column 0)
+    final dynamic rawNameValue = _getCellValue(row, 0);
+    final String nameString = (rawNameValue?.toString() ?? '').trim();
+    if (nameString.isEmpty) {
+      throw Exception('Nome é obrigatório');
     }
+
+    // Validate Quantidade (Column 1)
+    final dynamic rawQuantityValue = _getCellValue(row, 1);
+    final String quantityString = (rawQuantityValue?.toString() ?? '').trim();
+    if (quantityString.isEmpty) {
+      throw Exception('Quantidade é obrigatória');
+    }
+
+    final double? quantity = double.tryParse(quantityString.replaceAll(',', '.'));
+    if (quantity == null || quantity < 0) {
+      throw Exception('Quantidade deve ser um número válido >= 0. Valor recebido: "$quantityString"');
+    }
+
+    return ImportMerchandiseData(
+      name: nameString,
+      quantity: quantity,
+      barcode: _getCellValue(row, 2)?.toString().trim(),
+      category: _getCellValue(row, 3)?.toString().trim(),
+      description: _getCellValue(row, 4)?.toString().trim(),
+      costPrice: _parseDouble(_getCellValue(row, 5)),
+      salePrice: _parseDouble(_getCellValue(row, 6)),
+      unit: _getCellValue(row, 7)?.toString().trim(),
+      supplier: _getCellValue(row, 8)?.toString().trim(),
+      location: _getCellValue(row, 9)?.toString().trim(),
+      notes: _getCellValue(row, 10)?.toString().trim(),
+    );
   }
 
-  /// Obtém valor de uma célula tratando índices fora do range
+  /// Obtém valor de uma célula tratando índices fora do range e convertendo para String.
+  /// Retorna null se o valor for null ou o índice estiver fora do alcance
   dynamic _getCellValue(List<dynamic> row, int index) {
     if (index >= row.length) return null;
     final value = row[index];
@@ -298,7 +328,7 @@ class BulkImportService {
     return '''
 FORMATO DO ARQUIVO DE IMPORTAÇÃO
 
-O arquivo deve conter as seguintes colunas (nesta ordem):
+O arquivo deve ser Excel (.xlsx) ou CSV (.csv) com as seguintes colunas (nesta ordem):
 
 1. Nome* (obrigatório) - Nome da mercadoria
 2. Quantidade* (obrigatório) - Quantidade em estoque
@@ -335,6 +365,117 @@ Arroz Tipo 1,100,1234567890123,Alimentos,Arroz branco tipo 1,2.50,4.00,KG,Fornec
 Feijão Preto,50,9876543210987,Alimentos,Feijão preto premium,3.00,5.50,KG,Fornecedor B,Estoque A,Grão selecionado
 Açúcar Cristal,75,,Alimentos,Açúcar cristal refinado,1.80,3.20,KG,Fornecedor A,Estoque B,
 Óleo de Soja,30,5555666677778,Alimentos,Óleo de soja refinado,4.50,7.90,LT,Fornecedor C,Estoque A,Embalagem 900ml
-Macarrão Espaguete,25,1111222233334,Alimentos,Macarrão espaguete premium,1.20,2.80,PCT,Fornecedor A,Estoque B,Pacote 500g''';
+Macarrão Espaguete,25,1111222233334,Alimentos,Macarrão espaguete premium,1.20,2.80,PCT,Fornecedor A,Estoque B,Pacote 500g
+Sabão em Pó,40,2222333344445,Limpeza,Sabão em pó concentrado 1kg,6.80,12.90,PCT,Fornecedor GHI,Estoque C,Fórmula concentrada
+Refrigerante Cola,60,3333444455556,Bebidas,Refrigerante cola 2L,3.20,5.80,UN,Fornecedor JKL,Estoque A,Garrafa pet 2L
+Papel Higiênico,35,4444555566667,Higiene,Papel higiênico folha dupla c/12,8.50,15.90,PCT,Fornecedor MNO,Estoque C,Pacote com 12 rolos
+Leite Integral,80,5555666677778,Laticínios,Leite integral 1L,2.80,4.50,LT,Fornecedor PQR,Estoque B,Caixa tetra pak
+Biscoito Salgado,45,6666777788889,Alimentos,Biscoito cream cracker 400g,2.20,3.80,PCT,Fornecedor STU,Estoque A,Pacote 400g''';
+  }
+
+  /// Gera um arquivo Excel template com dados de exemplo
+  Future<File> generateExcelTemplate() async {
+    final excel = Excel.createExcel();
+    
+    // Remove a planilha padrão
+    excel.delete('Sheet1');
+    
+    // Cria uma nova planilha
+    final sheet = excel['Template_Importacao'];
+    
+    // Define os cabeçalhos
+    final headers = [
+      'Nome',
+      'Quantidade',
+      'Código de Barras',
+      'Categoria', 
+      'Descrição',
+      'Preço de Custo',
+      'Preço de Venda',
+      'Unidade',
+      'Fornecedor',
+      'Localização',
+      'Observações'
+    ];
+    
+    // Adiciona os cabeçalhos na primeira linha
+    for (int i = 0; i < headers.length; i++) {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = TextCellValue(headers[i]);
+      // Formata o cabeçalho
+      cell.cellStyle = CellStyle(
+        bold: true,
+        backgroundColorHex: ExcelColor.blue50,
+        horizontalAlign: HorizontalAlign.Center,
+      );
+    }
+    
+    // Dados de exemplo
+    final sampleData = [
+      ['Arroz Tipo 1', 100, '1234567890123', 'Alimentos', 'Arroz branco tipo 1 kg', 2.50, 4.00, 'KG', 'Fornecedor ABC', 'Estoque A', 'Produto premium'],
+      ['Feijão Preto', 50, '9876543210987', 'Alimentos', 'Feijão preto premium 1kg', 3.00, 5.50, 'KG', 'Fornecedor XYZ', 'Estoque A', 'Grão selecionado'],
+      ['Açúcar Cristal', 75, '', 'Alimentos', 'Açúcar cristal refinado 1kg', 1.80, 3.20, 'KG', 'Fornecedor ABC', 'Estoque B', ''],
+      ['Óleo de Soja', 30, '5555666677778', 'Alimentos', 'Óleo de soja refinado 900ml', 4.50, 7.90, 'LT', 'Fornecedor DEF', 'Estoque A', 'Embalagem 900ml'],
+      ['Macarrão Espaguete', 25, '1111222233334', 'Alimentos', 'Macarrão espaguete premium 500g', 1.20, 2.80, 'PCT', 'Fornecedor ABC', 'Estoque B', 'Pacote 500g'],
+      ['Sabão em Pó', 40, '2222333344445', 'Limpeza', 'Sabão em pó concentrado 1kg', 6.80, 12.90, 'PCT', 'Fornecedor GHI', 'Estoque C', 'Fórmula concentrada'],
+      ['Refrigerante Cola', 60, '3333444455556', 'Bebidas', 'Refrigerante cola 2L', 3.20, 5.80, 'UN', 'Fornecedor JKL', 'Estoque A', 'Garrafa pet 2L'],
+      ['Papel Higiênico', 35, '4444555566667', 'Higiene', 'Papel higiênico folha dupla c/12', 8.50, 15.90, 'PCT', 'Fornecedor MNO', 'Estoque C', 'Pacote com 12 rolos'],
+      ['Leite Integral', 80, '5555666677778', 'Laticínios', 'Leite integral 1L', 2.80, 4.50, 'LT', 'Fornecedor PQR', 'Estoque B', 'Caixa tetra pak'],
+      ['Biscoito Salgado', 45, '6666777788889', 'Alimentos', 'Biscoito cream cracker 400g', 2.20, 3.80, 'PCT', 'Fornecedor STU', 'Estoque A', 'Pacote 400g']
+    ];
+    
+    // Adiciona os dados de exemplo
+    for (int row = 0; row < sampleData.length; row++) {
+      for (int col = 0; col < sampleData[row].length; col++) {
+        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row + 1));
+        final value = sampleData[row][col];
+        
+        if (value is String) {
+          cell.value = TextCellValue(value);
+        } else if (value is int) {
+          cell.value = IntCellValue(value);
+        } else if (value is double) {
+          cell.value = DoubleCellValue(value);
+        }
+        
+        // Formata células obrigatórias (Nome e Quantidade) com cor diferente
+        if (col <= 1) {
+          cell.cellStyle = CellStyle(backgroundColorHex: ExcelColor.orange50);
+        }
+      }
+    }
+    
+    // Adiciona uma linha de instrução
+    final instructionCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: sampleData.length + 3));
+    instructionCell.value = TextCellValue('INSTRUÇÕES:');
+    instructionCell.cellStyle = CellStyle(bold: true);
+    
+    final instruction1 = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: sampleData.length + 4));
+    instruction1.value = TextCellValue('• Campos Nome e Quantidade são obrigatórios');
+    
+    final instruction2 = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: sampleData.length + 5));
+    instruction2.value = TextCellValue('• Você pode deletar os dados de exemplo e adicionar seus próprios dados');
+    
+    final instruction3 = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: sampleData.length + 6));
+    instruction3.value = TextCellValue('• Mantenha os cabeçalhos na primeira linha');
+    
+    final instruction4 = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: sampleData.length + 7));
+    instruction4.value = TextCellValue('• Use ponto (.) como separador decimal para preços');
+    
+    // Ajusta a largura das colunas
+    for (int i = 0; i < headers.length; i++) {
+      sheet.setColumnWidth(i, 20);
+    }
+    
+    // Gera o arquivo
+    final Directory tempDir = Directory.systemTemp;
+    const String fileName = 'template_importacao_mercadorias.xlsx';
+    final File file = File('${tempDir.path}/$fileName');
+    
+    final List<int> excelBytes = excel.encode()!;
+    await file.writeAsBytes(excelBytes);
+    
+    AppLogger.info('Template Excel gerado: ${file.path}', 'BulkImportService');
+    return file;
   }
 }

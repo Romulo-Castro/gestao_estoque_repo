@@ -1,7 +1,7 @@
 // src/routes/documentRoutes.js
 const express = require("express");
 const documentController = require("../controllers/documentController");
-const { validateDocument, validateDocumentHeaderUpdate, validateIdParam, handleValidationErrors } = require("../middleware/validators");
+const { validateDocument, validateIdParam, handleValidationErrors } = require("../middleware/validators");
 
 // Usar mergeParams para acessar :storeId da rota pai (storeRoutes)
 const router = express.Router({ mergeParams: true });
@@ -12,9 +12,6 @@ const router = express.Router({ mergeParams: true });
 router.get("/", documentController.getAllDocuments);
 router.post("/", validateDocument(), handleValidationErrors, documentController.createDocument);
 router.get("/:documentId", validateIdParam('documentId'), handleValidationErrors, documentController.getDocumentById);
-
-// PUT - Atualizar cabeçalho (limitado)
-router.put("/:documentId", validateIdParam('documentId'), validateDocumentHeaderUpdate(), handleValidationErrors, documentController.updateDocumentHeader);
 
 // DELETE - Cancelar documento (reverte estoque)
 router.delete("/:documentId", validateIdParam('documentId'), handleValidationErrors, documentController.cancelDocument);

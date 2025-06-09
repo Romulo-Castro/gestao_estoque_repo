@@ -272,6 +272,14 @@ const updateDocumentStatus = (documentId, storeId, status) =>
     runQuery('UPDATE documents SET status = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ? AND store_id = ?', 
     [status, documentId, storeId]);
 
+// Delete document and all its items (used for cancellation since status field is removed)
+const deleteDocumentAndItems = async (documentId, storeId) => {
+    // First delete all document items
+    await runQuery('DELETE FROM document_items WHERE document_id = ?', [documentId]);
+    // Then delete the document itself
+    await runQuery('DELETE FROM documents WHERE id = ? AND store_id = ?', [documentId, storeId]);
+};
+
 // --- Adicionar funções para DOCUMENTOS e DESPESAS ---
 // Exemplo: Criar documento e ajustar estoque (PRECISA DE TRANSAÇÃO!)
 async function createDocumentAndAdjustStock(documentData, documentItems) {
@@ -389,10 +397,10 @@ module.exports = {
     findDocumentByIdAndStore,
     findDocumentItemsByDocumentId,
     createDocumentHeader,
-    createDocumentItem,
-    updateStockQuantity,
+    createDocumentItem,    updateStockQuantity,
     updateDocumentHeaderDetails,
     updateDocumentStatus,
+    deleteDocumentAndItems,
 
     // Expenses
     // Adicionar createExpense, findExpenses, etc.

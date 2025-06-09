@@ -7,7 +7,7 @@ import '../../data/models/document_model.dart';
 import '../providers/refactored_document_provider.dart';
 import '../providers/store_provider.dart';
 import '../widgets/app_drawer.dart';
-import 'refactored_edit_document_screen.dart';
+import 'create_document_screen.dart';
 import 'document_detail_screen.dart';
 
 class RefactoredDocumentListScreen extends StatefulWidget {
@@ -423,11 +423,6 @@ class _RefactoredDocumentListScreenState extends State<RefactoredDocumentListScr
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton.icon(
-                    onPressed: () => _navigateToEditDocument(document),
-                    icon: const Icon(Icons.edit, size: 16),
-                    label: const Text('Editar'),
-                  ),
-                  TextButton.icon(
                     onPressed: () => _createAdjustment(document),
                     icon: const Icon(Icons.content_copy, size: 16),
                     label: const Text('Ajuste'),
@@ -702,22 +697,8 @@ class _RefactoredDocumentListScreenState extends State<RefactoredDocumentListScr
   void _navigateToCreateDocument([DocumentType? type]) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => RefactoredEditDocumentScreen(
+        builder: (context) => CreateDocumentScreen(
           defaultType: type,
-        ),
-      ),
-    ).then((result) {
-      if (result == true) {
-        _refreshDocuments();
-      }
-    });
-  }
-
-  void _navigateToEditDocument(DocumentModel document) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => RefactoredEditDocumentScreen(
-          documentId: document.id?.toString(),
         ),
       ),
     ).then((result) {
@@ -737,7 +718,7 @@ class _RefactoredDocumentListScreenState extends State<RefactoredDocumentListScr
   void _createAdjustment(DocumentModel baseDocument) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const RefactoredEditDocumentScreen(),
+        builder: (context) => const CreateDocumentScreen(),
         settings: RouteSettings(
           arguments: {
             'mode': 'adjustment',

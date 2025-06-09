@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../data/models/import_result.dart';
 import '../../../shared/services/bulk_import_service.dart';
 import '../providers/store_provider.dart';
@@ -16,12 +17,21 @@ class BulkImportScreen extends StatefulWidget {
 }
 
 class _BulkImportScreenState extends State<BulkImportScreen> {
-  final BulkImportService _importService = BulkImportService();
+  late BulkImportService _importService; // Declarado como late
   
   bool _isImporting = false;
   File? _selectedFile;
   ImportResult? _lastImportResult;
   String _importProgress = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // Obter ApiService do StoreProvider e inicializar BulkImportService
+    // É crucial que StoreProvider já tenha o ApiService configurado com o token.
+    final storeProvider = Provider.of<StoreProvider>(context, listen: false);
+    _importService = BulkImportService(storeProvider.apiService);
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -511,11 +521,11 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
     }
   }
   void _downloadTemplate() {
-    // Show template information and sample content
+    // Show template options dialog
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Template de Importação'),
+        title: const Text('Download Template de Importação'),
         content: SizedBox(
           width: double.maxFinite,
           child: SingleChildScrollView(
@@ -526,7 +536,51 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                 Text(_importService.getImportTemplateDescription()),
                 const SizedBox(height: 16),
                 const Text(
-                  'Exemplo de conteúdo CSV:',
+                  'Escolha o formato do template:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                
+                // Excel Template Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _downloadExcelTemplate();
+                    },
+                    icon: const Icon(Icons.table_chart),
+                    label: const Text('Download Template Excel (.xlsx)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green[600],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                
+                // CSV Template Button  
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _downloadCsvTemplate();
+                    },
+                    icon: const Icon(Icons.description),
+                    label: const Text('Download Template CSV (.csv)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue[600],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                const Text(
+                  'Exemplo de conteúdo:',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
@@ -557,6 +611,119 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _downloadExcelTemplate() async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Gerando template Excel...'),
+            ],
+          ),
+        ),
+      );
+
+      // Generate Excel template
+      final templateFile = await _importService.generateExcelTemplate();
+      
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Get downloads directory
+      Directory? downloadsDir;
+      if (Platform.isAndroid) {
+        downloadsDir = Directory('/storage/emulated/0/Download');
+      } else if (Platform.isWindows) {
+        final userProfile = Platform.environment['USERPROFILE'];
+        if (userProfile != null) {
+          downloadsDir = Directory('$userProfile\\Downloads');
+        }
+      } else {
+        downloadsDir = await getDownloadsDirectory();
+      }
+      
+      if (downloadsDir == null || !await downloadsDir.exists()) {
+        // Fallback to documents directory
+        downloadsDir = await getApplicationDocumentsDirectory();
+      }
+
+      // Copy file to downloads
+      final fileName = 'template_importacao_mercadorias_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+      final targetFile = File('${downloadsDir.path}/$fileName');
+      await templateFile.copy(targetFile.path);
+
+      // Clean up temp file
+      await templateFile.delete();
+
+      if (mounted) {
+        ErrorHandler.showSuccessSnackBar(
+          context, 
+          'Template Excel salvo em: ${targetFile.path}'
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if it's open
+      if (mounted) Navigator.of(context).pop();
+      
+      if (mounted) {
+        ErrorHandler.showErrorSnackBar(
+          context, 
+          'Erro ao gerar template Excel: $e'
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadCsvTemplate() async {
+    try {
+      // Get downloads directory
+      Directory? downloadsDir;
+      if (Platform.isAndroid) {
+        downloadsDir = Directory('/storage/emulated/0/Download');
+      } else if (Platform.isWindows) {
+        final userProfile = Platform.environment['USERPROFILE'];
+        if (userProfile != null) {
+          downloadsDir = Directory('$userProfile\\Downloads');
+        }
+      } else {
+        downloadsDir = await getDownloadsDirectory();
+      }
+      
+      if (downloadsDir == null || !await downloadsDir.exists()) {
+        // Fallback to documents directory
+        downloadsDir = await getApplicationDocumentsDirectory();
+      }
+
+      // Generate CSV content
+      final csvContent = _importService.generateSampleCsvContent();
+      
+      // Save CSV file
+      final fileName = 'template_importacao_mercadorias_${DateTime.now().millisecondsSinceEpoch}.csv';
+      final targetFile = File('${downloadsDir.path}/$fileName');
+      await targetFile.writeAsString(csvContent);
+
+      if (mounted) {
+        ErrorHandler.showSuccessSnackBar(
+          context, 
+          'Template CSV salvo em: ${targetFile.path}'
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showErrorSnackBar(
+          context, 
+          'Erro ao salvar template CSV: $e'
+        );
+      }
+    }
   }
 
   String _getFileSize(File file) {

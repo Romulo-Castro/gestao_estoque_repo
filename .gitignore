@@ -62,3 +62,59 @@ logs/
 *.swo
 *~
 
+# Package manager lock files (optional - remove if you want to commit them)
+# package-lock.json
+# yarn.lock
+
+# VSCode workspace settings
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/extensions.json
+
+# Security and sensitive files
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.crt
+config.json
+secrets.json
+
+# Test coverage and reports
+coverage/
+test-results/
+.nyc_output/
+*.lcov
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+._*
+
+# Network and system files
+.fuse_hidden*
+.nfs*
+
+# Project organization - files moved to appropriate folders
+# Tests are now in /tests/
+# Documentation is now in /docs/
+# Configuration is now in /config/
+
+# Generated files that should be ignored
+**/ephemeral/
+**/.dart_tool/
+**/build/
+**/.cxx/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/CMakeFiles/
+

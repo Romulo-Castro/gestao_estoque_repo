@@ -6,11 +6,11 @@ import '../../data/models/balance_sheet_model.dart';
 import '../../domain/entities/document_entity.dart';
 import '../providers/document_provider.dart';
 import '../providers/store_provider.dart';
-import '../screens/refactored_edit_document_screen.dart';
+import '../screens/create_document_screen.dart';
 import '../screens/document_detail_screen.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/balance_sheet_widget.dart';
 import '../../../shared/utils/logger.dart';
-import '../widgets/improved_balance_sheet_widget.dart';
 import '../../../shared/services/csv_export_service.dart';
 import '../../../shared/utils/error_handler.dart';
 
@@ -66,7 +66,7 @@ class _DocumentListScreenState extends State<DocumentListScreen>
   }
   
   Color _getDocColor(String type, String? status) {
-    if (status == "CANCELADO") return Colors.grey;
+    // Removed status check since status field no longer exists
     switch (type.toLowerCase()) {
       case 'entrada':
         return Colors.green;
@@ -130,7 +130,6 @@ class _DocumentListScreenState extends State<DocumentListScreen>
         final searchLower = _searchQuery.toLowerCase();
         return doc.id?.toString().toLowerCase().contains(searchLower) == true ||
                _getDocumentTypeDisplayName(doc.type).toLowerCase().contains(searchLower) ||
-               doc.status.toLowerCase().contains(searchLower) ||
                doc.date.toLowerCase().contains(searchLower);
       }).toList();
     }
@@ -280,30 +279,6 @@ class _DocumentListScreenState extends State<DocumentListScreen>
     );
   }
 
-  Future<void> _processSelectedDocuments() async {
-    try {
-      final docProvider = Provider.of<DocumentProvider>(context, listen: false);
-      int processedCount = 0;
-      
-      for (final docId in _selectedDocuments) {
-        await docProvider.updateDocumentStatus(int.parse(docId), 'PROCESSADO');
-        processedCount++;
-      }
-      
-      if (mounted) {
-        ErrorHandler.showSuccessSnackBar(
-          context,
-          "$processedCount documento(s) processado(s)!",
-        );
-      }
-      _clearSelection();
-      
-    } catch (e) {
-      if (mounted) {
-        ErrorHandler.showErrorSnackBar(context, "Erro ao processar: $e");
-      }
-    }
-  }
   Future<void> _generateReceiptForSelected() async {
     try {
       final docProvider = Provider.of<DocumentProvider>(context, listen: false);
@@ -471,10 +446,11 @@ class _DocumentListScreenState extends State<DocumentListScreen>
           onPressed: _exportDocuments,
         ),
         IconButton(
-          icon: const Icon(Icons.add_box),          onPressed: () {
+          icon: const Icon(Icons.add_box),
+          onPressed: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (ctx) => const RefactoredEditDocumentScreen(),
+                builder: (ctx) => const CreateDocumentScreen(),
               ),
             );
           },
@@ -587,13 +563,39 @@ class _DocumentListScreenState extends State<DocumentListScreen>
           children: _tabFilters.map((filter) {
             final filteredDocs = _getFilteredDocuments(docProvider.documents, filter);
               // Special handling for Balance Sheet tab
-            if (filter == 'BALANÇA') {              AppLogger.info('BALANÇA tab - Total documents: ${docProvider.documents.length}', 'DocumentListScreen');
+            if (filter == 'BALANÇA') {
+              AppLogger.info('BALANÇA tab - Total documents: ${docProvider.documents.length}', 'DocumentListScreen');
               AppLogger.info('BALANÇA tab - Filtered documents: ${filteredDocs.length}', 'DocumentListScreen');
               for (var doc in filteredDocs) {
-                AppLogger.debug('Document: ${doc.number}, Type: ${doc.type}, Date: ${doc.date}, Status: ${doc.status}', 'DocumentListScreen');
-              }return ImprovedBalanceSheetWidget(
-                documents: filteredDocs,
-                onExportBalanceSheet: _exportDocuments,
+                AppLogger.debug('Document: ${doc.number}, Type: ${doc.type}, Date: ${doc.date}', 'DocumentListScreen');
+              }
+              
+              // Use the full balance sheet widget
+              return BalanceSheetWidget(
+                documents: docProvider.documents, // Pass all documents, the widget will filter by period
+                onExportBalanceSheet: () async {
+                  // Export balance sheet functionality
+                  try {
+                    final balanceData = BalanceSheetData.fromDocuments(filteredDocs);
+                    final csvContent = CSVExportService.generateCSV(
+                      context: CSVExportContext.balanceSheet,
+                      data: balanceData,
+                    );
+                    
+                    AppLogger.info('Balance sheet exported: ${csvContent.length} characters', 'DocumentListScreen');
+                    
+                    if (mounted) {
+                      ErrorHandler.showSuccessSnackBar(
+                        context, 
+                        "Balancete exportado com sucesso! (${csvContent.length} caracteres)"
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ErrorHandler.showErrorSnackBar(context, "Erro ao exportar balancete: $e");
+                    }
+                  }
+                },
               );
             }
             
@@ -623,7 +625,7 @@ class _DocumentListScreenState extends State<DocumentListScreen>
     final formattedDate = doc.date.isNotEmpty 
         ? DateFormat("dd/MM/yyyy").format(DateTime.parse(doc.date))
         : "Data inválida";
-    final color = _getDocColor(doc.type, doc.status);
+    final color = _getDocColor(doc.type, null); // Pass null since status doesn't exist
 
     return InkWell(
       onTap: () {
@@ -708,15 +710,7 @@ class _DocumentListScreenState extends State<DocumentListScreen>
                       ),
                     ],
                     const SizedBox(height: 2),
-                    // Status
-                    Text(
-                      doc.status,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: color,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                    // Removed status display since status field no longer exists
                   ],
                 ),
               ),
@@ -760,11 +754,6 @@ class _DocumentListScreenState extends State<DocumentListScreen>
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,        children: [
-          _buildQuickActionButton(
-            icon: Icons.play_arrow,
-            label: "Processar",
-            onPressed: _processSelectedDocuments,
-          ),
           _buildQuickActionButton(
             icon: Icons.receipt,
             label: "Recibo",
@@ -845,9 +834,9 @@ class _DocumentListScreenState extends State<DocumentListScreen>
             // Para "TODOS", deixar o usuário escolher
             defaultType = null;
             break;        }
-          Navigator.of(context).push(
+        Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (ctx) => RefactoredEditDocumentScreen(defaultType: _stringToDocumentType(defaultType)),
+            builder: (ctx) => CreateDocumentScreen(defaultType: _stringToDocumentType(defaultType)),
           ),
         );
       },

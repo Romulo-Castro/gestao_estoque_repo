@@ -7,7 +7,6 @@ abstract class DocumentRemoteDataSource {
   Future<List<DocumentModel>> getDocuments(int storeId);
   Future<DocumentModel?> getDocumentById(int documentId);
   Future<DocumentModel> createDocument(DocumentModel document);
-  Future<DocumentModel> updateDocument(DocumentModel document);
   Future<void> deleteDocument(int documentId);
   Future<List<DocumentModel>> getDocumentsByType(int storeId, String type);
   Future<List<DocumentModel>> getDocumentsInDateRange(
@@ -86,28 +85,6 @@ class DocumentRemoteDataSourceImpl implements DocumentRemoteDataSource {
       } else {
         throw DocumentRemoteException(
           'Failed to create document: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      if (e is DocumentRemoteException) rethrow;
-      throw DocumentRemoteException('Network error: $e');
-    }
-  }
-
-  @override
-  Future<DocumentModel> updateDocument(DocumentModel document) async {
-    try {
-      final response = await httpClient.put(
-        Uri.parse('$baseUrl/api/documents/${document.id}'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(document.toJson()),
-      );
-
-      if (response.statusCode == 200) {
-        return DocumentModel.fromJson(json.decode(response.body));
-      } else {
-        throw DocumentRemoteException(
-          'Failed to update document: ${response.statusCode}',
         );
       }
     } catch (e) {

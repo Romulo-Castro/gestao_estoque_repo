@@ -38,8 +38,7 @@ class CleanDocumentProvider extends ChangeNotifier {
   List<DocumentEntity> get saidaDocuments =>
       _documents.where((doc) => doc.type == DocumentType.saida).toList();
 
-  List<DocumentEntity> get activeDocuments =>
-      _documents.where((doc) => !doc.isCancelled).toList();
+  // Removed activeDocuments getter since there's no status field anymore
 
   // Methods
   void setStoreId(int storeId) {
@@ -66,8 +65,9 @@ class CleanDocumentProvider extends ChangeNotifier {
       AppLogger.info('Loaded ${documents.length} documents', 'CleanDocumentProvider');
       
       // Log detailed document information for debugging
-      for (final doc in documents) {        AppLogger.debug('Document: ${doc.number}, type: ${doc.type}, '
-              'date: ${doc.date}, value: ${doc.totalValue}, status: ${doc.status}', 'CleanDocumentProvider');
+      for (final doc in documents) {
+        AppLogger.debug('Document: ${doc.number}, type: ${doc.type}, '
+              'date: ${doc.date}, value: ${doc.totalValue}', 'CleanDocumentProvider');
       }
       
       notifyListeners();
@@ -117,9 +117,8 @@ class CleanDocumentProvider extends ChangeNotifier {
     
     final filteredDocuments = documents.where((doc) {
       final isInPeriod = period.contains(doc.date);
-      final isActive = !doc.isCancelled;
-      AppLogger.debug('Document ${doc.number}: period=$isInPeriod, active=$isActive', 'CleanDocumentProvider');
-      return isInPeriod && isActive;
+      AppLogger.debug('Document ${doc.number}: period=$isInPeriod', 'CleanDocumentProvider');
+      return isInPeriod;
     }).toList();
 
     AppLogger.debug('Filtered to ${filteredDocuments.length} documents', 'CleanDocumentProvider');
@@ -139,7 +138,7 @@ class CleanDocumentProvider extends ChangeNotifier {
         return saidaDocuments;
       case 'BALANÇA':
       case 'BALANCA':
-        return activeDocuments;
+        return _documents; // Return all documents since there's no status filtering
       case 'TODOS':
       default:
         return _documents;

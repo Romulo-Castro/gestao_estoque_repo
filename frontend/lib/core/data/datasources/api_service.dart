@@ -424,17 +424,6 @@ class ApiService {
     return DocumentModel.fromJson(data);
   }
 
-  Future<DocumentModel> updateDocumentHeader(int storeId, int documentId, DocumentModel document) async {
-    final url = Uri.parse('$baseUrl/stores/$storeId/documents/$documentId');
-    final response = await http.put(
-      url,
-      headers: _headers,
-      body: json.encode(document.toJson()),
-    );
-    final data = await _handleResponse(response) as Map<String, dynamic>;
-    return DocumentModel.fromJson(data);
-  }
-
   Future<void> cancelDocument(int storeId, int documentId) async {
     final url = Uri.parse('$baseUrl/stores/$storeId/documents/$documentId');
     final response = await http.delete(url, headers: _headers);
@@ -453,28 +442,6 @@ class ApiService {
     final response = await http.get(url, headers: _headers);
     final data = await _handleResponse(response) as List;
     return data.map((e) => DocumentModel.fromJson(e)).toList();
-  }
-
-  Future<DocumentModel> updateDocument(int storeId, int documentId, DocumentModel document) async {
-    final url = Uri.parse('$baseUrl/stores/$storeId/documents/$documentId');
-    final response = await http.put(
-      url,
-      headers: _headers,
-      body: json.encode(document.toJson()),
-    );
-    final data = await _handleResponse(response) as Map<String, dynamic>;
-    return DocumentModel.fromJson(data);
-  }
-
-  Future<DocumentModel> updateDocumentStatus(int storeId, int documentId, String status) async {
-    final url = Uri.parse('$baseUrl/stores/$storeId/documents/$documentId/status');
-    final response = await http.patch(
-      url,
-      headers: _headers,
-      body: json.encode({'status': status}),
-    );
-    final data = await _handleResponse(response) as Map<String, dynamic>;
-    return DocumentModel.fromJson(data);
   }
 
   Future<void> deleteDocument(int storeId, int documentId) async {

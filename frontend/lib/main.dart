@@ -12,7 +12,6 @@ import 'core/presentation/providers/item_group_provider.dart';
 import 'core/presentation/providers/customer_provider.dart';
 import 'core/presentation/providers/supplier_provider.dart';
 import 'core/presentation/providers/document_provider.dart';
-import 'core/presentation/providers/refactored_document_provider.dart';
 import 'core/presentation/providers/stock_provider.dart';
 import 'core/presentation/providers/theme_provider.dart';
 
@@ -30,7 +29,7 @@ import 'core/presentation/screens/edit_customer_screen.dart';
 import 'core/presentation/screens/supplier_list_screen.dart';
 import 'core/presentation/screens/edit_supplier_screen.dart';
 import 'core/presentation/screens/document_list_screen.dart';
-import 'core/presentation/screens/refactored_edit_document_screen.dart';
+import 'core/presentation/screens/create_document_screen.dart';
 import 'core/presentation/screens/document_detail_screen.dart';
 import 'core/presentation/screens/reports_screen.dart';
 import 'core/presentation/screens/settings_screen.dart';
@@ -69,9 +68,8 @@ class AppRoutes {
   static const editSupplier = '/edit-supplier';
   // Rotas para documentos
   static const documentList = '/document-list';
-  static const editDocument = '/edit-document';
   static const refactoredDocumentList = '/refactored-document-list';
-  static const refactoredEditDocument = '/refactored-edit-document';
+  static const createDocument = '/create-document';
   static const documentDetail = '/document-detail';
   // Novas rotas
   static const reports = '/reports';
@@ -174,27 +172,20 @@ class MyApp extends StatelessWidget {
             provider.updateAuthToken(auth.token);
             return provider;
           },
-        ),        ChangeNotifierProxyProvider<AuthProvider, DocumentProvider>(
-          create: (_) => DocumentProvider(),
-          update: (context, auth, previous) {
-            final provider = previous ?? DocumentProvider();
-            provider.updateAuthToken(auth.token);
-            return provider;
-          },
-        ),
-        ChangeNotifierProxyProvider<AuthProvider, RefactoredDocumentProvider>(
-          create: (_) => RefactoredDocumentProvider(),
-          update: (context, auth, previous) {
-            final provider = previous ?? RefactoredDocumentProvider();
-            provider.updateAuthToken(auth.token);
-            return provider;
-          },
-        ),
-        ChangeNotifierProxyProvider<AuthProvider, StockProvider>(
+        ),        ChangeNotifierProxyProvider<AuthProvider, StockProvider>(
           create: (_) => StockProvider(),
           update: (context, auth, previous) {
             final provider = previous ?? StockProvider();
             provider.updateAuthToken(auth.token);
+            return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider2<AuthProvider, StockProvider, DocumentProvider>(
+          create: (_) => DocumentProvider(),
+          update: (context, auth, stock, previous) {
+            final provider = previous ?? DocumentProvider();
+            provider.updateAuthToken(auth.token);
+            provider.setStockProvider(stock);
             return provider;
           },
         ),
@@ -229,7 +220,7 @@ class MyApp extends StatelessWidget {
           AppRoutes.editSupplier: (context) => const EditSupplierScreen(),
           // Rotas para documentos
           AppRoutes.documentList: (context) => const DocumentListScreen(),
-          AppRoutes.editDocument: (context) => const RefactoredEditDocumentScreen(),
+          AppRoutes.createDocument: (context) => const CreateDocumentScreen(),
           AppRoutes.documentDetail: (context) => const DocumentDetailScreen(documentId: 0), // Corrigido para passar o parâmetro obrigatório
           // Novas rotas
           AppRoutes.reports: (context) => const ReportsScreen(),

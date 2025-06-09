@@ -2,12 +2,10 @@
 const { DateRange } = require('../../core/domain/value-objects/date-range');
 const ValidationError = require('../../shared/errors/validation-error');
 
-class DocumentController {
-    constructor(container) {
+class DocumentController {    constructor(container) {
         this.getDocumentsUseCase = container.get('getDocuments');
         this.calculateBalanceSheetUseCase = container.get('calculateBalanceSheet');
         this.createDocumentUseCase = container.get('createDocument');
-        this.updateDocumentUseCase = container.get('updateDocument');
         this.cancelDocumentUseCase = container.get('cancelDocument');
     }
 
@@ -38,10 +36,6 @@ class DocumentController {
                 filters.supplierId = parseInt(req.query.supplierId);
             }
             
-            if (req.query.status) {
-                filters.status = req.query.status;
-            }
-
             const options = {
                 includeStats: req.query.includeStats === 'true',
                 includeItems: req.query.includeItems === 'true',
@@ -193,48 +187,7 @@ class DocumentController {
                 });
             }
             next(error);
-        }
-    }    // PUT /api/stores/:storeId/documents/:documentId
-    async updateDocumentHeader(req, res, next) {
-        try {
-            const storeId = parseInt(req.params.storeId);
-            const documentId = parseInt(req.params.documentId);
-            const { documentDate, customerId, supplierId, notes } = req.body;
-
-            const updateData = {};
-            if (documentDate !== undefined) updateData.documentDate = new Date(documentDate);
-            if (customerId !== undefined) updateData.customerId = customerId;
-            if (supplierId !== undefined) updateData.supplierId = supplierId;
-            if (notes !== undefined) updateData.notes = notes;
-
-            const result = await this.updateDocumentUseCase.execute({
-                documentId,
-                storeId,
-                ...updateData
-            });
-
-            res.status(200).json({
-                status: 'success',
-                message: 'Documento atualizado com sucesso',
-                data: result.data
-            });
-        } catch (error) {
-            if (error instanceof ValidationError) {
-                return res.status(400).json({
-                    status: 'error',
-                    message: error.message,
-                    errors: error.errors
-                });
-            }
-            if (error.message === 'Documento não encontrado') {
-                return res.status(404).json({
-                    status: 'error',
-                    message: error.message
-                });
-            }
-            next(error);
-        }
-    }    // DELETE /api/stores/:storeId/documents/:documentId
+        }    }    // DELETE /api/stores/:storeId/documents/:documentId
     async cancelDocument(req, res, next) {
         try {
             const storeId = parseInt(req.params.storeId);
@@ -245,10 +198,12 @@ class DocumentController {
                 storeId
             });
 
+            // The use case now returns { message: '...', documentId: ... }
+            // or throws an error if cancellation failed.
             res.status(200).json({
                 status: 'success',
-                message: 'Documento cancelado com sucesso',
-                data: result.data
+                message: result.message, // Use message from use case
+                data: { id: result.documentId } // Send back the ID of the cancelled document
             });
         } catch (error) {
             if (error instanceof ValidationError) {
@@ -258,13 +213,21 @@ class DocumentController {
                     errors: error.errors
                 });
             }
-            if (error.message === 'Documento não encontrado') {
+            // Specific error from use case for not found
+            if (error.message === 'Documento não encontrado nesta loja' || error.message === 'Documento não encontrado ou já removido') {
                 return res.status(404).json({
                     status: 'error',
                     message: error.message
                 });
             }
-            next(error);
+            // Generic error for other issues during cancellation
+            if (error.message.startsWith('Erro ao cancelar documento:')) {
+                 return res.status(500).json({
+                    status: 'error',
+                    message: error.message
+                });
+            }
+            next(error); // Fallback for other unexpected errors
         }
     }
 }

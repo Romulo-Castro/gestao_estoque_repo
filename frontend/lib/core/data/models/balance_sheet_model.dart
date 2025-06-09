@@ -48,7 +48,7 @@ class BalanceSheetData {
     DateTime? latestDate;
 
     for (final document in documents) {
-      if (document.status == 'CANCELADO') continue;
+      // Removed status check since status field no longer exists
       
       // Parse document date
       DateTime? docDate;

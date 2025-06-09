@@ -63,7 +63,7 @@ class CSVExportService {
         _escapeCSV(doc.number),
         _escapeCSV(doc.type),
         _escapeCSV(formattedDate),
-        _escapeCSV(doc.status),
+        _escapeCSV('ATIVO'), // Default status since status field was removed
         _escapeCSV(''), // customerId not available in DocumentModel
         _escapeCSV(''), // supplierId not available in DocumentModel  
         _escapeCSV(doc.description),
