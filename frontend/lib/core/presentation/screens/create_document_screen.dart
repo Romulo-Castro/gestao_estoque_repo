@@ -205,20 +205,16 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
                         ),
                         validator: (value) => value?.isEmpty == true ? 'Campo obrigatório' : null,                      ),
                       const SizedBox(height: 16),
-                      DropdownButtonFormField<DocumentType>(
+                      ImprovedDropdown<DocumentType>(
+                        labelText: 'Tipo',
                         value: _selectedType,
-                        decoration: const InputDecoration(
-                          labelText: 'Tipo',
-                          border: OutlineInputBorder(),
-                        ),
                         items: DocumentType.values
-                            .where((type) => type != DocumentType.unknown) // Remove tipo desconhecido
-                            .map((type) {
-                          return DropdownMenuItem(
-                            value: type,
-                            child: Text(_getTypeLabel(type)),
-                          );
-                        }).toList(),
+                            .where((type) => type != DocumentType.unknown)
+                            .map((type) => DropdownMenuItem(
+                                  value: type,
+                                  child: Text(_getTypeLabel(type)),
+                                ))
+                            .toList(),
                         onChanged: (value) {
                           if (value != null) {
                             setState(() {
@@ -246,21 +242,18 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
                           validator: (value) => value?.isEmpty == true ? 'Campo obrigatório' : null,
                         ),
                       ),
-                      const SizedBox(width: 16),                      Expanded(
-                        child: DropdownButtonFormField<DocumentType>(
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ImprovedDropdown<DocumentType>(
+                          labelText: 'Tipo',
                           value: _selectedType,
-                          decoration: const InputDecoration(
-                            labelText: 'Tipo',
-                            border: OutlineInputBorder(),
-                          ),
                           items: DocumentType.values
-                              .where((type) => type != DocumentType.unknown) // Remove tipo desconhecido
-                              .map((type) {
-                            return DropdownMenuItem(
-                              value: type,
-                              child: Text(_getTypeLabel(type)),
-                            );
-                          }).toList(),
+                              .where((type) => type != DocumentType.unknown)
+                              .map((type) => DropdownMenuItem(
+                                    value: type,
+                                    child: Text(_getTypeLabel(type)),
+                                  ))
+                              .toList(),
                           onChanged: (value) {
                             if (value != null) {
                               setState(() {
@@ -322,18 +315,15 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
   Widget _buildCustomerDropdown() {
     return Consumer<CustomerProvider>(
       builder: (context, provider, child) {
-        return DropdownButtonFormField<Customer>(
+        return ImprovedDropdown<Customer>(
+          labelText: 'Cliente *',
           value: _selectedCustomer,
-          decoration: const InputDecoration(
-            labelText: 'Cliente *',
-            border: OutlineInputBorder(),
-          ),
-          items: provider.customers.map((customer) {
-            return DropdownMenuItem(
-              value: customer,
-              child: Text(customer.name),
-            );
-          }).toList(),
+          items: provider.customers
+              .map((customer) => DropdownMenuItem(
+                    value: customer,
+                    child: Text(customer.name),
+                  ))
+              .toList(),
           onChanged: (value) {
             setState(() {
               _selectedCustomer = value;
@@ -347,18 +337,15 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
   Widget _buildSupplierDropdown() {
     return Consumer<SupplierProvider>(
       builder: (context, provider, child) {
-        return DropdownButtonFormField<Supplier>(
+        return ImprovedDropdown<Supplier>(
+          labelText: 'Fornecedor *',
           value: _selectedSupplier,
-          decoration: const InputDecoration(
-            labelText: 'Fornecedor *',
-            border: OutlineInputBorder(),
-          ),
-          items: provider.suppliers.map((supplier) {
-            return DropdownMenuItem(
-              value: supplier,
-              child: Text(supplier.name),
-            );
-          }).toList(),
+          items: provider.suppliers
+              .map((supplier) => DropdownMenuItem(
+                    value: supplier,
+                    child: Text(supplier.name),
+                  ))
+              .toList(),
           onChanged: (value) {
             setState(() {
               _selectedSupplier = value;
@@ -603,72 +590,55 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
                               );
                             }
                             
-                            // Usando Theme para garantir cores e comportamento consistentes
-                            return Theme(
-                              data: Theme.of(context).copyWith(
-                                canvasColor: Theme.of(context).scaffoldBackgroundColor,
-                              ),
-                              child: DropdownButtonFormField<StockItem>(
-                                value: _selectedStockItem,
-                                decoration: const InputDecoration(
-                                  labelText: 'Selecione um Item *',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                ),
-                                isExpanded: true,
-                                menuMaxHeight: 300, // Aumentar altura para melhor visualização
-                                dropdownColor: Theme.of(context).scaffoldBackgroundColor,
-                                alignment: AlignmentDirectional.centerStart,
-                                items: stockProvider.items.map((item) {
-                                  final isLowStock = item.quantity < 5;
-                                  return DropdownMenuItem(
-                                    value: item,
-                                    child: SizedBox(
-                                      width: double.infinity,
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            item.name,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                            return ImprovedDropdown<StockItem>(
+                              labelText: 'Selecione um Item *',
+                              value: _selectedStockItem,
+                              items: stockProvider.items.map((item) {
+                                final isLowStock = item.quantity < 5;
+                                return DropdownMenuItem(
+                                  value: item,
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          item.name,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
                                           ),
-                                          Text(
-                                            'Estoque: ${item.quantity.toStringAsFixed(0)}${isLowStock ? ' (Baixo)' : ''}',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: isLowStock ? Colors.red : Colors.grey[600],
-                                              fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          'Estoque: ${item.quantity.toStringAsFixed(0)}${isLowStock ? ' (Baixo)' : ''}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isLowStock ? Colors.red : Colors.grey[600],
+                                            fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
                                           ),
-                                        ],
-                                      ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
                                     ),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  setDialogState(() {
-                                    _selectedStockItem = value;
-                                    if (value != null && value.price != null) {
-                                      _priceController.text = value.price!.toStringAsFixed(2);
-                                    }
-                                  });
-                                },
-                                validator: (value) => value == null ? 'Selecione um item' : null,
-                              ),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  _selectedStockItem = value;
+                                  if (value != null && value.price != null) {
+                                    _priceController.text = value.price!.toStringAsFixed(2);
+                                  }
+                                });
+                              },
+                              validator: (value) => value == null ? 'Selecione um item' : null,
                             );
                           },
                         ),
-                        // Adicionando espaço extra depois do dropdown para evitar problemas de overlay
-                        const SizedBox(height: 24),
                         TextFormField(
                           controller: _quantityController,
                           decoration: InputDecoration(
