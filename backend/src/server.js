@@ -32,6 +32,7 @@ const {
 // Importar rotas
 const authRoutes = require('./routes/authRoutes');
 const storeRoutes = require('./routes/storeRoutes');
+const apiDocsRoutes = require('./routes/apiDocsRoutes');
 
 const app = express();
 const PORT = config.server.port;
@@ -126,8 +127,7 @@ async function startServer() {
 
         // === API Principal ===
         console.log("🛣️  Configurando rotas da API...");
-        
-        // Rota raiz com informações da API
+          // Rota raiz com informações da API
         app.get('/api', (req, res) => {
             res.json({
                 name: 'Gestão de Estoques API',
@@ -137,15 +137,15 @@ async function startServer() {
                 endpoints: {
                     auth: '/api/auth',
                     stores: '/api/stores',
+                    documentation: '/api-docs',
                     health: '/health',
                     metrics: '/metrics'
                 }
             });
-        });
-
-        // Montar rotas principais
+        });// Montar rotas principais
         app.use('/api/auth', authLimiter, authRoutes);
         app.use('/api/stores', storeRoutes);
+        app.use('/api-docs', apiDocsRoutes);
 
         console.log("✅ Rotas configuradas com sucesso.");
 

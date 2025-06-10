@@ -54,13 +54,19 @@ exports.createStore = catchAsync(async (req, res, next) => {
         throw new AppError('Nome da loja é obrigatório.', 400);
     }
 
-    // Usar transação se precisar garantir ambas inserções
+    // Usar transação para garantir consistência
     try {
+        // Iniciar transação
+        await db.beginTransaction();
+        
         const storeResult = await db.createStoreDB({ name: name.trim(), address: address?.trim() });
         const storeId = storeResult.lastID;
 
         // Adiciona o criador como 'owner' da loja
         await db.addUserToStoreDB({ userId, storeId, role: 'owner' });
+        
+        // Confirmar transação
+        await db.commitTransaction();
 
         const newStore = await db.findStoreByIdDB(storeId); // Busca para retornar
         if (!newStore) {
@@ -70,6 +76,8 @@ exports.createStore = catchAsync(async (req, res, next) => {
         sendSuccessResponse(res, newStore, 'Loja criada com sucesso', 201);
 
     } catch (error) {
+        // Desfazer transação em caso de erro
+        await db.rollbackTransaction();
         throw error;
     }
 });
@@ -117,16 +125,31 @@ exports.updateStore = catchAsync(async (req, res, next) => {
 exports.deleteStore = catchAsync(async (req, res, next) => {
     const storeId = validateId(req.params.storeId, 'ID da loja');
     
-    // APENAS OWNER PODE DELETAR?
+    // Verificação de segurança adicional: apenas owner pode deletar
     if (req.userStoreRole !== 'owner') {
         return forbidden('Apenas o proprietário pode excluir a loja');
     }
 
-    // CUIDADO: ON DELETE CASCADE removerá tudo relacionado!
-    const result = await db.deleteStoreDB(storeId);
-    if (result.changes === 0) {
-        return notFound('Loja');
-    }
+    try {
+        // Iniciar transação para garantir consistência
+        await db.beginTransaction();
+        
+        // CUIDADO: ON DELETE CASCADE removerá tudo relacionado à loja
+        // Isso inclui: itens, grupos, clientes, fornecedores, documentos, etc.
+        const result = await db.deleteStoreDB(storeId);
+        
+        if (result.changes === 0) {
+            await db.rollbackTransaction();
+            return notFound('Loja');
+        }
 
-    sendSuccessResponse(res, null, 'Loja e todos os seus dados foram excluídos com sucesso');
+        // Confirmar transação
+        await db.commitTransaction();
+        
+        sendSuccessResponse(res, null, 'Loja e todos os seus dados foram excluídos com sucesso');
+    } catch (error) {
+        // Desfazer transação em caso de erro
+        await db.rollbackTransaction();
+        throw error;
+    }
 });

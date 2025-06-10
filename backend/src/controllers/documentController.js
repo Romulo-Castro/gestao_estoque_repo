@@ -73,22 +73,37 @@ exports.createDocument = catchAsync(async (req, res, next) => {
         if (!supplier) {
             throw new AppError(`Fornecedor com ID ${supplierId} não encontrado na loja.`, 400);
         }
-    }
-
-    try {
+    }    try {
         await db.beginTransaction();
+
+        // Verificação prévia de todo o estoque para vendas
+        if (type === "sale") {
+            for (const item of items) {
+                const itemId = item.itemId || item.item_id;
+                const itemQuantity = item.quantity;
+                
+                const stockItem = await db.findStockItemByIdAndStore(itemId, storeId);
+                if (!stockItem) {
+                    throw new AppError(`Item com ID ${itemId} não encontrado na loja.`, 400);
+                }
+                
+                if (stockItem.quantity < itemQuantity) {
+                    throw new AppError(`Estoque insuficiente para o item "${stockItem.name}". Disponível: ${stockItem.quantity}, Solicitado: ${itemQuantity}`, 400);
+                }
+            }
+        }
 
         // 1. Criar o cabeçalho do documento
         const docResult = await db.createDocumentHeader({
             storeId,
             type,
             date: document_date,
-            customerId: customerId || null,
-            supplierId: supplierId || null,
+            customerId: type === "sale" ? (customerId || null) : null,
+            supplierId: type === "purchase" ? (supplierId || null) : null,
             notes: notes?.trim() || null,
             totalAmount: total_amount || 0
         });
-        const documentId = docResult.lastID;        // 2. Criar os itens do documento e ajustar estoque
+        const documentId = docResult.lastID;// 2. Criar os itens do documento e ajustar estoque
         for (const item of items) {
             // Aceita tanto itemId quanto item_id para compatibilidade
             const itemId = item.itemId || item.item_id;
@@ -96,23 +111,20 @@ exports.createDocument = catchAsync(async (req, res, next) => {
             
             if (!itemId || !itemQuantity || itemQuantity <= 0) {
                 throw new AppError('Item inválido no documento: ID e quantidade positiva são obrigatórios.', 400);
-            }
-
-            // Validar se itemId existe na loja
+            }            // Validar se itemId existe na loja
             const stockItem = await db.findStockItemByIdAndStore(itemId, storeId);
             if (!stockItem) {
                 throw new AppError(`Item com ID ${itemId} não encontrado na loja.`, 400);
-            }            // Validar estoque para vendas
-            if (type === "sale" && stockItem.quantity < itemQuantity) {
-                throw new AppError(`Estoque insuficiente para o item "${stockItem.name}". Disponível: ${stockItem.quantity}, Solicitado: ${itemQuantity}`, 400);
             }
+            
+            // Estoque já foi validado anteriormente para vendas
 
             await db.createDocumentItem({
                 documentId,
                 itemId: itemId, // Use the extracted itemId
                 quantity: itemQuantity,
                 unitPrice: item.unitPrice || item.unit_price || 0, // Support both naming conventions
-            });            // Ajustar estoque - fix type checking to use English types
+            });// Ajustar estoque - fix type checking to use English types
             const quantityChange = (type === "purchase") ? itemQuantity : -itemQuantity;
             await db.updateStockQuantity(itemId, storeId, quantityChange);
         }

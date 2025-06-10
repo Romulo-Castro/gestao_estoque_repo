@@ -34,11 +34,10 @@ const validateRegistration = () => [
                 throw new Error('Formato de email inválido.');
             }
             return true;
-        }),
-    body('password')
+        }),    body('password')
         .notEmpty().withMessage('Senha obrigatória.')
         .isLength({ min: 8, max: 128 }).withMessage('Senha deve ter entre 8 e 128 caracteres.')
-        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]*$/)
         .withMessage('Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula, 1 número e 1 caractere especial (@$!%*?&).')
 ];
 const validateLogin = () => [
@@ -170,8 +169,37 @@ const validateDocumentHeaderUpdate = () => [
     body('notes').optional({ checkFalsy: true }).trim().isString().withMessage('Observações devem ser texto.')
 ];
 
+// Validação para atualização de perfil
+const validateProfileUpdate = () => [
+    body('name')
+        .trim()
+        .notEmpty().withMessage('Nome obrigatório.')
+        .isLength({ min: 2, max: 100 }).withMessage('Nome deve ter entre 2 e 100 caracteres.')
+        .matches(/^[a-zA-ZàáâãéêíóôõúçÀÁÂÃÉÊÍÓÔÕÚÇ\s]+$/).withMessage('Nome deve conter apenas letras e espaços.')
+        .escape(),
+    body('email')
+        .trim()
+        .notEmpty().withMessage('Email obrigatório.')
+        .isEmail().withMessage('Email inválido.')
+        .isLength({ max: 255 }).withMessage('Email muito longo.')
+        .normalizeEmail()
+];
+
+// Validação para mudança de senha
+const validatePasswordChange = () => [
+    body('currentPassword')
+        .notEmpty().withMessage('Senha atual obrigatória.')
+        .isLength({ min: 1 }).withMessage('Senha atual inválida.'),
+    body('newPassword')
+        .notEmpty().withMessage('Nova senha obrigatória.')
+        .isLength({ min: 8, max: 128 }).withMessage('Nova senha deve ter entre 8 e 128 caracteres.')
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]*$/)
+        .withMessage('Nova senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula, 1 número e 1 caractere especial (@$!%*?&).')
+];
+
 module.exports = {
     handleValidationErrors, validateRegistration, validateLogin,
     validateStore, validateStockItem, validateItemGroup, validateIdParam,
-    validateCustomer, validateSupplier, validateDocument, validateDocumentHeaderUpdate
+    validateCustomer, validateSupplier, validateDocument, validateDocumentHeaderUpdate,
+    validateProfileUpdate, validatePasswordChange
 };

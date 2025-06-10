@@ -1,78 +1,40 @@
 # Sistema de Gestão de Estoque PRO 📦
 
-<div align="center">
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![Flutter](https://img.shields.io/badge/Flutter-3.19+-blue.svg)](https://flutter.dev/)
+[![SQLite](https://img.shields.io/badge/SQLite-3.x-orange.svg)](https://sqlite.org/)
+[![License](https://img.shields.io/badge/License-ISC-yellow.svg)](LICENSE)
+[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
 
-![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)
+> Sistema completo de gestão de estoque empresarial construído com Flutter (frontend) e Node.js (backend), implementando **Clean Architecture** e padrões de desenvolvimento modernos.
 
-Sistema completo de gestão de estoques com arquitetura moderna, segurança avançada e interface mobile intuitiva.
+## 🌟 Características Principais
 
-[🚀 Quick Start](#-quick-start) •
-[📖 Documentação](#-api-endpoints) •
-[🛡️ Segurança](#️-segurança) •
-[🧪 Testes](#-testes) •
-[📱 Screenshots](#-screenshots)
+### 🎯 **Funcionalidades Core**
+- ✅ **Autenticação Segura** - JWT com refresh tokens
+- ✅ **Multi-Store Management** - Gestão de múltiplas lojas com controle de acesso por roles
+- ✅ **Gestão Completa de Estoque** - CRUD de itens com grupos, categorias e propriedades customizáveis
+- ✅ **Gestão de Clientes e Fornecedores** - Cadastro completo com dados de contato
+- ✅ **Documentos de Movimentação** - Entradas e saídas com numeração automática
+- ✅ **Relatórios e Dashboards** - Analytics com gráficos e métricas de desempenho
+- ✅ **Upload de Imagens** - Suporte a imagens de produtos com validação
+- ✅ **Importação/Exportação** - Bulk import via CSV/Excel
+- ✅ **Scanner de Código de Barras** - Integração com câmera para leitura de códigos
 
-</div>
+### 🏗️ **Arquitetura Moderna**
+- ✅ **Clean Architecture** implementada no Flutter
+- ✅ **Provider Pattern** para state management
+- ✅ **RESTful API** seguindo melhores práticas
+- ✅ **SQLite** com transações ACID
+- ✅ **Middleware de Segurança** com rate limiting e validação
+- ✅ **Health Checks** e monitoramento de sistema
 
----
-
-## 🎯 Visão Geral
-
-Sistema empresarial para gestão completa de estoques com foco em **segurança**, **performance** e **usabilidade**. Desenvolvido com Clean Architecture e boas práticas de desenvolvimento.
-
-### 🏗️ Arquitetura
-- **Backend**: Node.js + Express + SQLite com Clean Architecture
-- **Frontend**: Flutter (Mobile/Desktop) com Provider Pattern
-- **Segurança**: JWT, Rate Limiting, Headers de Segurança, Detecção de Ataques
-- **Database**: SQLite com migrations automáticas
-
----
-
-## ✨ Funcionalidades
-
-### 🔐 Autenticação & Autorização
-- [x] Sistema de login/registro seguro com JWT
-- [x] Middleware de autenticação robusto
-- [x] Controle de acesso granular por loja
-- [x] Rate limiting inteligente para proteção
-- [x] Session management com refresh tokens
-
-### 📊 Gestão de Estoque
-- [x] CRUD completo de itens com upload de imagens
-- [x] Gerenciamento de múltiplas lojas/filiais
-- [x] Controle automático de entrada e saída
-- [x] Cálculo em tempo real de balanços
-- [x] Alertas de estoque baixo
-- [x] Relatórios de movimentação
-- [x] Importação/exportação de dados (CSV)
-
-### 🤝 Gestão de Relacionamentos
-- [x] Cadastro completo de clientes
-- [x] Gerenciamento de fornecedores
-- [x] Documentos de movimentação (entradas/saídas)
-- [x] Histórico detalhado de transações
-- [x] Integração cliente-fornecedor-estoque
-
-### 📱 Interface Mobile
-- [x] App Flutter responsivo para Android/iOS/Windows
-- [x] Gestão de estado com Provider Pattern
-- [x] Scanner de códigos de barras integrado
-- [x] Interface moderna e intuitiva
-- [x] Modo offline com sincronização
-- [x] Notificações e alertas
-
-### 🛡️ Segurança Avançada
-- [x] Headers de segurança (Helmet.js)
-- [x] Rate limiting por endpoint
-- [x] Detecção automática de ataques
-- [x] Validação rigorosa de uploads
-- [x] Logging de segurança
-- [x] Sanitização de dados
-
----
+### 🔒 **Segurança Enterprise**
+- ✅ **Helmet.js** para proteção de headers HTTP
+- ✅ **Rate Limiting** por endpoint
+- ✅ **Validação de Input** em todas as camadas
+- ✅ **Hashing seguro** com bcrypt
+- ✅ **CORS configurado** para ambientes específicos
 
 ## 🚀 Quick Start
 
@@ -172,92 +134,73 @@ gestao_estoque_repo/
 
 ### 🔐 Autenticação
 ```http
-POST   /api/auth/register     # Cadastro de usuário
-POST   /api/auth/login        # Login
-POST   /api/auth/logout       # Logout
-POST   /api/auth/refresh      # Refresh token
-GET    /api/auth/me          # Dados do usuário
+POST   /api/auth/register      # Registro de usuário
+POST   /api/auth/login         # Login
+POST   /api/auth/refresh       # Refresh token
+GET    /api/auth/profile       # Perfil do usuário
+PUT    /api/auth/profile       # Atualizar perfil
+PUT    /api/auth/password      # Alterar senha
 ```
 
 ### 🏪 Lojas
 ```http
-GET    /api/stores           # Listar lojas
-POST   /api/stores           # Criar loja
-PUT    /api/stores/:id       # Atualizar loja
-DELETE /api/stores/:id       # Deletar loja
+GET    /api/stores             # Listar lojas do usuário
+POST   /api/stores             # Criar nova loja
+GET    /api/stores/:id         # Detalhes da loja
+PUT    /api/stores/:id         # Atualizar loja
+DELETE /api/stores/:id         # Deletar loja
 ```
 
 ### 📦 Estoque
 ```http
-GET    /api/stock            # Listar itens
-POST   /api/stock            # Criar item
-PUT    /api/stock/:id        # Atualizar item
-DELETE /api/stock/:id        # Deletar item
-POST   /api/stock/:id/image  # Upload de imagem
+GET    /api/stores/:storeId/stock        # Listar itens
+POST   /api/stores/:storeId/stock        # Criar item
+GET    /api/stores/:storeId/stock/:id    # Detalhes do item
+PUT    /api/stores/:storeId/stock/:id    # Atualizar item
+DELETE /api/stores/:storeId/stock/:id    # Deletar item
+POST   /api/stores/:storeId/stock/:id/image # Upload de imagem
+```
+
+### 📁 Grupos de Itens
+```http
+GET    /api/stores/:storeId/groups       # Listar grupos
+POST   /api/stores/:storeId/groups       # Criar grupo
+PUT    /api/stores/:storeId/groups/:id   # Atualizar grupo
+DELETE /api/stores/:storeId/groups/:id   # Deletar grupo
 ```
 
 ### 👥 Clientes
 ```http
-GET    /api/customers        # Listar clientes
-POST   /api/customers        # Criar cliente
-PUT    /api/customers/:id    # Atualizar cliente
-DELETE /api/customers/:id    # Deletar cliente
+GET    /api/stores/:storeId/customers        # Listar clientes
+POST   /api/stores/:storeId/customers        # Criar cliente
+PUT    /api/stores/:storeId/customers/:id    # Atualizar cliente
+DELETE /api/stores/:storeId/customers/:id    # Deletar cliente
 ```
 
 ### 🏭 Fornecedores
 ```http
-GET    /api/suppliers        # Listar fornecedores
-POST   /api/suppliers        # Criar fornecedor
-PUT    /api/suppliers/:id    # Atualizar fornecedor
-DELETE /api/suppliers/:id    # Deletar fornecedor
+GET    /api/stores/:storeId/suppliers        # Listar fornecedores
+POST   /api/stores/:storeId/suppliers        # Criar fornecedor
+PUT    /api/stores/:storeId/suppliers/:id    # Atualizar fornecedor
+DELETE /api/stores/:storeId/suppliers/:id    # Deletar fornecedor
 ```
 
 ### 📄 Documentos
 ```http
-GET    /api/documents        # Listar documentos
-POST   /api/documents        # Criar documento
-GET    /api/documents/:id    # Buscar documento
-PUT    /api/documents/:id    # Atualizar documento
-DELETE /api/documents/:id    # Deletar documento
+GET    /api/stores/:storeId/documents        # Listar documentos
+POST   /api/stores/:storeId/documents        # Criar documento
+GET    /api/stores/:storeId/documents/:id    # Buscar documento
+PUT    /api/stores/:storeId/documents/:id    # Atualizar documento
+DELETE /api/stores/:storeId/documents/:id    # Deletar documento
 ```
 
-### 📈 Monitoramento
+### 📊 Monitoramento
 ```http
-GET    /health              # Status do servidor
-GET    /api/stats           # Estatísticas do sistema
+GET    /health                 # Health check básico
+GET    /health/ready           # Readiness check
+GET    /health/live            # Liveness check
+GET    /metrics                # Métricas do sistema
 ```
-
----
-
-## 🛡️ Segurança
-
-### 🔒 Rate Limiting
-| Endpoint | Limite | Janela |
-|----------|--------|--------|
-| Geral | 100 req | 15 min |
-| Auth | 5 req | 15 min |
-| Upload | 10 req | 5 min |
-
-### 🛡️ Headers de Segurança
-- **CSP**: Content Security Policy
-- **HSTS**: HTTP Strict Transport Security
-- **X-Frame-Options**: SAMEORIGIN
-- **X-Content-Type-Options**: nosniff
-- **X-XSS-Protection**: 1; mode=block
-
-### 🚨 Detecção de Ataques
-- ✅ XSS (Cross-Site Scripting)
-- ✅ SQL Injection
-- ✅ Directory Traversal  
-- ✅ Command Injection
-- ✅ LDAP Injection
-- ✅ XXE (XML External Entity)
-
-### 📎 Validação de Uploads
-- **Tamanho máximo**: 10MB por arquivo
-- **Tipos permitidos**: JPG, PNG, PDF, CSV, TXT
-- **Sanitização**: Nomes de arquivo
-- **Validação**: Magic numbers e extensões
 
 ---
 
@@ -299,27 +242,6 @@ flutter test integration_test/
 - ✅ **Frontend**: 78% coverage (UI components)
 - ✅ **Segurança**: 100% coverage (Security middleware)
 - ✅ **API**: 92% coverage (Endpoints)
-
----
-
-## 📱 Screenshots
-
-<details>
-<summary>📱 Clique para ver as telas do app</summary>
-
-### 🔐 Tela de Login
-Aguardando screenshots...
-
-### 📊 Dashboard
-Aguardando screenshots...
-
-### 📦 Gestão de Estoque
-Aguardando screenshots...
-
-### 📄 Documentos
-Aguardando screenshots...
-
-</details>
 
 ---
 
@@ -416,51 +338,41 @@ flutter build web --release
 
 ---
 
-## 📈 Performance
+## 📚 Dependências Principais
 
-### ⚡ Métricas
-- **API Response Time**: < 100ms (95th percentile)
-- **Database Queries**: Otimizadas com índices
-- **Memory Usage**: < 512MB (Backend)
-- **Bundle Size**: 15MB (Flutter APK)
-
-### 🔄 Otimizações
-- ✅ Connection pooling (SQLite)
-- ✅ Query optimization com índices
-- ✅ Caching de resultados frequentes
-- ✅ Compressão de assets (gzip)
-- ✅ Lazy loading no frontend
-
----
-
-## 🤝 Contribuição
-
-### 🛠️ Como Contribuir
-
-1. **Fork** o projeto
-2. **Clone** o fork: `git clone https://github.com/seu-usuario/gestao_estoque_repo.git`
-3. **Crie** uma branch: `git checkout -b feature/nova-funcionalidade`
-4. **Commit** suas mudanças: `git commit -am 'Add: nova funcionalidade'`
-5. **Push** para a branch: `git push origin feature/nova-funcionalidade`
-6. **Abra** um Pull Request
-
-### 📝 Padrões de Commit
-```
-feat: nova funcionalidade
-fix: correção de bug
-docs: documentação
-style: formatação
-refactor: refatoração
-test: testes
-chore: tarefas de build
+### Backend Dependencies
+```json
+{
+  "express": "^4.21.2",           // Web framework
+  "sqlite3": "^5.1.7",           // Database
+  "jsonwebtoken": "^9.0.2",      // JWT authentication
+  "bcryptjs": "^3.0.2",          // Password hashing
+  "multer": "2.0.1",             // File upload
+  "helmet": "^8.1.0",            // Security headers
+  "express-rate-limit": "^7.5.0", // Rate limiting
+  "cors": "^2.8.5",              // CORS handling
+  "morgan": "^1.10.0",           // Request logging
+  "express-validator": "^7.2.1"   // Input validation
+}
 ```
 
-### 🐛 Reportar Bugs
-Use o GitHub Issues com:
-- Descrição clara do problema
-- Passos para reproduzir
-- Screenshots se aplicável
-- Ambiente (OS, versões)
+### Frontend Dependencies
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^0.13.5                  # HTTP client
+  provider: ^6.1.2               # State management
+  shared_preferences: ^2.2.3     # Local storage
+  image_picker: ^1.0.0           # Image selection
+  camera: ^0.10.0                # Camera access
+  mobile_scanner: ^7.0.1         # Barcode scanning
+  file_picker: ^10.1.9           # File selection
+  pdf: ^3.10.8                   # PDF generation
+  intl: ^0.18.1                  # Internationalization
+  flutter_secure_storage: ^9.2.2 # Secure storage
+  get_it: ^7.7.0                 # Dependency injection
+```
 
 ---
 
@@ -504,80 +416,124 @@ copy backend\inventory_data.db backup\inventory_$(Get-Date -Format "yyyyMMdd").d
 ```
 </details>
 
+<details>
+<summary><strong>Como habilitar notificações push?</strong></summary>
+
+1. Configure Firebase Cloud Messaging
+2. Adicione as configurações no `pubspec.yaml`
+3. Configure os tokens no backend
+</details>
+
+<details>
+<summary><strong>Como adicionar novos campos personalizados?</strong></summary>
+
+Use o campo `properties` JSON nos itens de estoque:
+```json
+{
+  "properties": {
+    "cor": "azul",
+    "tamanho": "M", 
+    "marca": "Nike"
+  }
+}
+```
+</details>
+
 ---
 
-## 🔄 Roadmap
+## 🔍 Features Avançadas
 
-### 🎯 Próximas Versões
+### 📊 **Analytics & Reporting**
+- Dashboard com métricas de estoque
+- Relatórios de movimentação por período
+- Análise de produtos mais vendidos
+- Gráficos de tendências de estoque
+- Exportação de relatórios em PDF
 
-#### v2.0 - Q3 2025
-- [ ] Dashboard com gráficos avançados
-- [ ] Relatórios personalizáveis  
-- [ ] Integração aprimorada com código de barras
-- [ ] Sistema de notificações push
+### 🔄 **Sincronização e Backup**
+- Backup automático do SQLite
+- Importação/Exportação de dados
+- Sync entre múltiplos dispositivos
+- Recovery de dados
 
-#### v2.1 - Q4 2025
-- [ ] API GraphQL
-- [ ] Modo offline completo
-- [ ] PWA (Progressive Web App)
+### 📱 **Multi-Platform Support**
+- **Android** - APK nativo
+- **iOS** - App Store ready
+- **Windows** - Desktop application
+- **Web** - Progressive Web App (PWA)
+- **macOS** - Desktop application
+
+### 🔐 **Segurança Enterprise**
+- Rate limiting por IP
+- Detecção de atividade suspeita
+- Logs de auditoria completos
+- Validação de uploads de arquivo
+- Headers de segurança (Helmet.js)
+
+### 🚀 **Performance**
+- SQLite com WAL mode
+- Cache de consultas frequentes
+- Lazy loading de imagens
+- Compressão de assets
+- Health checks automáticos
+
+---
+
+## 🛠️ Desenvolvimento
+
+### 📋 **Roadmap**
+- [ ] Integração com APIs de código de barras
+- [ ] Módulo de pedidos/compras
+- [ ] Integração com sistemas fiscais
+- [ ] App mobile offline-first
 - [ ] Multi-idioma (i18n)
+- [ ] Temas dark/light
+- [ ] Notificações push
+- [ ] API GraphQL
 
-#### v3.0 - Q1 2026
-- [ ] Machine Learning para previsões
-- [ ] Integração com ERPs
-- [ ] API RESTful pública
-- [ ] Marketplace de plugins
+### 🤝 **Contribuindo**
+1. Fork o projeto
+2. Crie uma branch (`git checkout -b feature/nova-funcionalidade`)
+3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
+4. Push para a branch (`git push origin feature/nova-funcionalidade`)
+5. Abra um Pull Request
 
----
-
-## 🏆 Status do Projeto
-
-<div align="center">
-
-### 🟢 **PRONTO PARA PRODUÇÃO**
-
-| Componente | Status | Coverage | Performance |
-|------------|--------|----------|-------------|
-| **Backend API** | ✅ Stable | 85% | Excellent |
-| **Frontend Mobile** | ✅ Stable | 78% | Good |
-| **Security** | ✅ Hardened | 100% | Excellent |
-| **Database** | ✅ Optimized | 92% | Good |
-| **Documentation** | ✅ Complete | - | - |
-
-</div>
+### 📝 **Convenções de Código**
+- **Backend**: ESLint + Prettier
+- **Frontend**: Dart Analysis + Custom lints
+- **Commits**: Conventional Commits
+- **Branches**: GitFlow workflow
 
 ---
 
 ## 📄 Licença
 
-Este projeto está licenciado sob a **MIT License**.
+Este projeto está licenciado sob a Licença ISC - veja o arquivo [LICENSE](LICENSE) para detalhes.
 
-```
-MIT License
+---
 
-Copyright (c) 2025 Sistema de Gestão de Estoque PRO
+## 👥 Equipe
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files...
-```
+- **Backend Developer** - Implementação da API REST e banco de dados
+- **Frontend Developer** - Desenvolvimento do app Flutter
+- **DevOps Engineer** - CI/CD e infraestrutura
+- **QA Engineer** - Testes e qualidade
 
 ---
 
 ## 📞 Suporte
 
-### 💬 Contato
-- **GitHub Issues**: Para bugs e feature requests
-- **Documentação**: Consulte este README e os arquivos em `/docs`
-
-### 🌟 Mostre seu Apoio
-Se este projeto foi útil para você, considere dar uma ⭐ no GitHub!
+- **Email**: suporte@gestaodeestoque.com
+- **Discord**: [Servidor da Comunidade](https://discord.gg/gestao-estoque)
+- **Documentation**: [Docs completa](https://docs.gestaodeestoque.com)
+- **Issues**: [GitHub Issues](https://github.com/seu-usuario/gestao_estoque_repo/issues)
 
 ---
 
 <div align="center">
 
-**[⬆ Voltar ao topo](#sistema-de-gestão-de-estoque-pro-)**
+**⭐ Se este projeto te ajudou, considere dar uma estrela! ⭐**
 
-Made with ❤️ for inventory management
+Made with ❤️ by **Sistema de Gestão de Estoque PRO Team**
 
 </div>

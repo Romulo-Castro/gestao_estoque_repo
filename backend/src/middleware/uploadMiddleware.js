@@ -27,10 +27,9 @@ if (!fs.existsSync(uploadPath)) {
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, uploadPath); // Define o diretório de destino
-    },
-    filename: function (req, file, cb) {
+    },    filename: function (req, file, cb) {
         // Define um nome de arquivo único para evitar colisões
-        const itemId = req.params.id || 'unknown'; // Pega o ID do item da rota
+        const itemId = req.params.itemId || 'unknown'; // Pega o ID do item da rota (corrigido: params.itemId em vez de params.id)
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const extension = path.extname(file.originalname); // Pega a extensão original
         cb(null, `item-${itemId}-${uniqueSuffix}${extension}`);
@@ -81,7 +80,7 @@ const upload = multer({
 
 // Middleware personalizado para capturar erros do multer
 const uploadWithErrorHandling = (req, res, next) => {
-    upload.single('productImage')(req, res, (err) => {
+    upload.single('image')(req, res, (err) => {
         if (err instanceof multer.MulterError) {
             console.error('Erro do Multer:', err);
             if (err.code === 'LIMIT_FILE_SIZE') {

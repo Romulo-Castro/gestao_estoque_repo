@@ -49,29 +49,27 @@ const collectMetrics = (req, res, next) => {
  * Verificar saúde do banco de dados
  */
 const checkDatabaseHealth = async () => {
-    return new Promise((resolve) => {
+    try {
         const startTime = Date.now();
         
-        // Executar uma query simples para testar conectividade
-        db.get("SELECT 1 as test", [], (err, row) => {
-            const responseTime = Date.now() - startTime;
-            
-            if (err) {
-                metrics.dbErrors++;
-                resolve({
-                    status: 'unhealthy',
-                    error: err.message,
-                    responseTime
-                });
-            } else {
-                metrics.dbQueries++;
-                resolve({
-                    status: 'healthy',
-                    responseTime
-                });
-            }
-        });
-    });
+        // Usar getQuery que está exportado pelo módulo database
+        await db.getQuery("SELECT 1 as test", []);
+        
+        const responseTime = Date.now() - startTime;
+        metrics.dbQueries++;
+        
+        return {
+            status: 'healthy',
+            responseTime
+        };
+    } catch (err) {
+        metrics.dbErrors++;
+        return {
+            status: 'unhealthy',
+            error: err.message,
+            responseTime: Date.now() - Date.now()
+        };
+    }
 };
 
 /**

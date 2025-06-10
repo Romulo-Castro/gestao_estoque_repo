@@ -71,12 +71,16 @@ exports.createStockItem = catchAsync(async (req, res, next) => {
     if (groupId !== null && groupId !== undefined && isNaN(parseInt(groupId))) {
         throw new AppError('ID do grupo deve ser um número válido.', 400);
     }
-
-    // Cria o item passando o objeto properties (ou um objeto vazio) e groupId
+    
+    // Validação de quantidade para não permitir valores negativos
+    const parsedQuantity = parseFloat(quantity) || 0;
+    if (parsedQuantity < 0) {
+        throw new AppError('A quantidade não pode ser negativa.', 400);
+    }    // Cria o item passando o objeto properties (ou um objeto vazio) e groupId
     const result = await db.createStockItemInStore({
         storeId,
         name: name.trim(),
-        quantity: parseFloat(quantity) || 0.0,
+        quantity: parsedQuantity,
         groupId: groupId || null,
         properties: properties || {}
     });
@@ -112,6 +116,12 @@ exports.updateStockItem = catchAsync(async (req, res, next) => {
     // Validação de groupId se fornecido
     if (groupId !== null && groupId !== undefined && isNaN(parseInt(groupId))) {
         throw new AppError('ID do grupo deve ser um número válido.', 400);
+    }
+    
+    // Validação de quantidade para não permitir valores negativos
+    const parsedQuantity = parseFloat(quantity);
+    if (!isNaN(parsedQuantity) && parsedQuantity < 0) {
+        throw new AppError('A quantidade não pode ser negativa.', 400);
     }
 
     const existingItem = await db.findStockItemByIdAndStore(itemId, storeId);

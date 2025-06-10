@@ -1,8 +1,8 @@
 // src/routes/authRoutes.js
 const express = require('express');
-const authController = require('../controllers/authController'); // Assumindo que você criará este
-const { validateRegistration, validateLogin, handleValidationErrors } = require('../middleware/validators'); // Assumindo validadores
-const { authenticateToken } = require('../middleware/authMiddleware'); // Middleware para autenticação
+const authController = require('../controllers/authController'); // Back to original
+const { validateRegistration, validateLogin, validateProfileUpdate, validatePasswordChange, handleValidationErrors } = require('../middleware/validators');
+const { authenticateToken } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -10,9 +10,9 @@ const router = express.Router();
 // POST /api/auth/register
 router.post(
     '/register',
-    validateRegistration(), // Aplicar regras de validação para registro
-    handleValidationErrors, // Middleware para checar resultados da validação
-    authController.register // Chamar a função do controller
+    validateRegistration(),
+    handleValidationErrors,
+    authController.register
 );
 
 // Rota de Login de Usuário
@@ -30,9 +30,19 @@ router.get('/me', authenticateToken, authController.getMe);
 
 // Rotas de gerenciamento de perfil de usuário
 // PUT /api/auth/profile - Atualizar perfil do usuário (nome, email e opcionalmente senha)
-router.put('/profile', authenticateToken, authController.updateProfile);
+router.put('/profile', 
+    authenticateToken, 
+    validateProfileUpdate(),
+    handleValidationErrors,
+    authController.updateProfile
+);
 
 // PUT /api/auth/change-password - Alterar apenas a senha
-router.put('/change-password', authenticateToken, authController.changePassword);
+router.put('/change-password', 
+    authenticateToken, 
+    validatePasswordChange(),
+    handleValidationErrors,
+    authController.changePassword
+);
 
 module.exports = router;

@@ -7,7 +7,7 @@ const customerRoutes = require("./customerRoutes");
 const supplierRoutes = require("./supplierRoutes");
 const documentRoutes = require("./documentRoutes"); // Importa as rotas de documentos
 const { authenticateToken } = require("../middleware/authMiddleware");
-// const { validateStore, handleValidationErrors } = require(\'../middleware/validators\');
+const { validateStore, validateIdParam, handleValidationErrors } = require("../middleware/validators");
 
 const router = express.Router();
 
@@ -18,8 +18,8 @@ router.use(authenticateToken);
 router.get("/", storeController.getUserStores);
 router.post(
   "/",
-  // validateStore(),
-  // handleValidationErrors,
+  validateStore(),
+  handleValidationErrors,
   storeController.createStore
 );
 
@@ -27,18 +27,27 @@ router.post(
 router.use("/:storeId", storeController.checkStoreAccessMiddleware);
 
 // GET /api/stores/:storeId
-router.get("/:storeId", storeController.getStoreById);
+router.get("/:storeId", 
+  validateIdParam('storeId'),
+  handleValidationErrors,
+  storeController.getStoreById
+);
 
 // PUT /api/stores/:storeId
 router.put(
   "/:storeId",
-  // validateStore(),
-  // handleValidationErrors,
+  validateIdParam('storeId'),
+  validateStore(),
+  handleValidationErrors,
   storeController.updateStore
 );
 
 // DELETE /api/stores/:storeId
-router.delete("/:storeId", storeController.deleteStore);
+router.delete("/:storeId", 
+  validateIdParam('storeId'),
+  handleValidationErrors,
+  storeController.deleteStore
+);
 
 // === Aninhamento das Rotas de Estoque ===
 router.use("/:storeId/stock", stockRoutes);
