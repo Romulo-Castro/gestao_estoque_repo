@@ -193,33 +193,26 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
             const SizedBox(height: 20),
             LayoutBuilder(
               builder: (context, constraints) {
-                bool useColumnLayout = constraints.maxWidth < 600;
-                return Flex(
-                  direction: useColumnLayout ? Axis.vertical : Axis.horizontal,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: TextFormField(
+                // Em telas pequenas (< 600px), mostrar campos verticalmente
+                if (constraints.maxWidth < 600) {
+                  return Column(
+                    children: [
+                      TextFormField(
                         controller: _numberController,
                         decoration: const InputDecoration(
-                          labelText: 'Número do Documento',
+                          labelText: 'Número',
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.confirmation_number_outlined),
                         ),
-                        validator: (value) => value?.isEmpty == true ? 'Campo obrigatório' : null,
-                      ),
-                    ),
-                    SizedBox(width: useColumnLayout ? 0 : 16, height: useColumnLayout ? 16 : 0),
-                    Flexible(
-                      child: DropdownButtonFormField<DocumentType>(
+                        validator: (value) => value?.isEmpty == true ? 'Campo obrigatório' : null,                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<DocumentType>(
                         value: _selectedType,
                         decoration: const InputDecoration(
-                          labelText: 'Tipo de Documento',
+                          labelText: 'Tipo',
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.article_outlined),
                         ),
                         items: DocumentType.values
-                            .where((type) => type != DocumentType.unknown)
+                            .where((type) => type != DocumentType.unknown) // Remove tipo desconhecido
                             .map((type) {
                           return DropdownMenuItem(
                             value: type,
@@ -230,15 +223,59 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
                           if (value != null) {
                             setState(() {
                               _selectedType = value;
+                              // Limpar seleções quando o tipo mudar
                               _selectedCustomer = null;
                               _selectedSupplier = null;
                             });
                           }
                         },
                       ),
-                    ),
-                  ],
-                );
+                    ],
+                  );
+                } else {
+                  // Em telas maiores, mostrar lado a lado
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _numberController,
+                          decoration: const InputDecoration(
+                            labelText: 'Número',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (value) => value?.isEmpty == true ? 'Campo obrigatório' : null,
+                        ),
+                      ),
+                      const SizedBox(width: 16),                      Expanded(
+                        child: DropdownButtonFormField<DocumentType>(
+                          value: _selectedType,
+                          decoration: const InputDecoration(
+                            labelText: 'Tipo',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: DocumentType.values
+                              .where((type) => type != DocumentType.unknown) // Remove tipo desconhecido
+                              .map((type) {
+                            return DropdownMenuItem(
+                              value: type,
+                              child: Text(_getTypeLabel(type)),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                _selectedType = value;
+                                // Limpar seleções quando o tipo mudar
+                                _selectedCustomer = null;
+                                _selectedSupplier = null;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                }
               },
             ),
             const SizedBox(height: 16),
@@ -289,7 +326,6 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
           decoration: const InputDecoration(
             labelText: 'Cliente *',
             border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.person_outline),
           ),
           items: provider.customers.map((customer) {
             return DropdownMenuItem(
@@ -316,7 +352,6 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
           decoration: const InputDecoration(
             labelText: 'Fornecedor *',
             border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.store_mall_directory_outlined),
           ),
           items: provider.suppliers.map((supplier) {
             return DropdownMenuItem(
@@ -569,37 +604,73 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
                                 child: Text('Nenhum item disponível em estoque'),
                               );
                             }
+                            
+                            // Usando Theme para garantir cores e comportamento consistentes
                             return Theme(
-                              data: Theme.of(dialogContext).copyWith(
-                                canvasColor: Theme.of(dialogContext).scaffoldBackgroundColor,
+                              data: Theme.of(context).copyWith(
+                                canvasColor: Theme.of(context).scaffoldBackgroundColor,
                               ),
                               child: DropdownButtonFormField<StockItem>(
                                 value: _selectedStockItem,
                                 decoration: const InputDecoration(
-                                  labelText: 'Selecionar Item do Estoque',
+                                  labelText: 'Selecione um Item *',
                                   border: OutlineInputBorder(),
-                                  prefixIcon: Icon(Icons.inventory_2_outlined),
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 ),
                                 isExpanded: true,
-                                menuMaxHeight: 300,
-                                items: stockProvider.items.map((StockItem item) {
-                                  return DropdownMenuItem<StockItem>(
+                                menuMaxHeight: 300, // Aumentar altura para melhor visualização
+                                dropdownColor: Theme.of(context).scaffoldBackgroundColor,
+                                alignment: AlignmentDirectional.centerStart,
+                                items: stockProvider.items.map((item) {
+                                  final isLowStock = item.quantity < 5;
+                                  return DropdownMenuItem(
                                     value: item,
-                                    child: Text(item.name),
+                                    child: SizedBox(
+                                      width: double.infinity,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            item.name,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            'Estoque: ${item.quantity.toStringAsFixed(0)}${isLowStock ? ' (Baixo)' : ''}',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: isLowStock ? Colors.red : Colors.grey[600],
+                                              fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   );
                                 }).toList(),
-                                onChanged: (StockItem? value) {
+                                onChanged: (value) {
                                   setDialogState(() {
                                     _selectedStockItem = value;
+                                    if (value != null && value.price != null) {
+                                      _priceController.text = value.price!.toStringAsFixed(2);
+                                    }
                                   });
                                 },
-                                  validator: (StockItem? value) =>
-                                      value == null ? 'Selecione um item' : null,
-                                ),
-                              );
+                                validator: (value) => value == null ? 'Selecione um item' : null,
+                              ),
+                            );
                           },
                         ),
-                        const SizedBox(height: 16),
+                        // Adicionando espaço extra depois do dropdown para evitar problemas de overlay
+                        const SizedBox(height: 24),
                         TextFormField(
                           controller: _quantityController,
                           decoration: const InputDecoration(
