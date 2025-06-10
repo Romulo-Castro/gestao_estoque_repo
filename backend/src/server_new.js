@@ -45,7 +45,6 @@ global.metrics = { requests: 0, totalResponseTime: 0 };
  */
 const gracefulShutdown = (signal) => {
     console.log(`\n📡 Recebido sinal ${signal}. Iniciando graceful shutdown...`);
-    
     process.exit(0);
 };
 

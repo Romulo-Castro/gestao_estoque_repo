@@ -14,27 +14,105 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 // Regras de Validação
-const validateRegistration = () => [ /* ... (código anterior) ... */
-    body('name').trim().notEmpty().withMessage('Nome obrigatório.').isLength({ min: 2 }),
-    body('email').trim().notEmpty().isEmail().withMessage('Email inválido.'),
-    body('password').notEmpty().isLength({ min: 6 }).withMessage('Senha deve ter >= 6 caracteres.')
+const validateRegistration = () => [
+    body('name')
+        .trim()
+        .notEmpty().withMessage('Nome obrigatório.')
+        .isLength({ min: 2, max: 100 }).withMessage('Nome deve ter entre 2 e 100 caracteres.')
+        .matches(/^[a-zA-ZàáâãéêíóôõúçÀÁÂÃÉÊÍÓÔÕÚÇ\s]+$/).withMessage('Nome deve conter apenas letras e espaços.')
+        .escape(),
+    body('email')
+        .trim()
+        .notEmpty().withMessage('Email obrigatório.')
+        .isEmail().withMessage('Email inválido.')
+        .isLength({ max: 255 }).withMessage('Email muito longo.')
+        .normalizeEmail()
+        .custom(async (value) => {
+            // Verificar se é um domínio válido básico
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(value)) {
+                throw new Error('Formato de email inválido.');
+            }
+            return true;
+        }),
+    body('password')
+        .notEmpty().withMessage('Senha obrigatória.')
+        .isLength({ min: 8, max: 128 }).withMessage('Senha deve ter entre 8 e 128 caracteres.')
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+        .withMessage('Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula, 1 número e 1 caractere especial (@$!%*?&).')
 ];
-const validateLogin = () => [ /* ... (código anterior) ... */
-    body('email').trim().notEmpty().isEmail().withMessage('Email inválido.'),
-    body('password').notEmpty().withMessage('Senha obrigatória.')
+const validateLogin = () => [
+    body('email')
+        .trim()
+        .notEmpty().withMessage('Email obrigatório.')
+        .isEmail().withMessage('Email inválido.')
+        .normalizeEmail()
+        .isLength({ max: 255 }).withMessage('Email muito longo.'),
+    body('password')
+        .notEmpty().withMessage('Senha obrigatória.')
+        .isLength({ min: 1, max: 128 }).withMessage('Senha inválida.')
 ];
-const validateStore = () => [ /* ... (código anterior) ... */
-    body('name').trim().notEmpty().withMessage('Nome da loja obrigatório.').isLength({ min: 3 }),
-    body('address').optional({ checkFalsy: true }).trim().isLength({ min: 5 })
+const validateStore = () => [
+    body('name')
+        .trim()
+        .notEmpty().withMessage('Nome da loja obrigatório.')
+        .isLength({ min: 3, max: 100 }).withMessage('Nome deve ter entre 3 e 100 caracteres.')
+        .matches(/^[a-zA-ZàáâãéêíóôõúçÀÁÂÃÉÊÍÓÔÕÚÇ0-9\s\-_.]+$/).withMessage('Nome contém caracteres inválidos.')
+        .escape(),
+    body('address')
+        .optional({ checkFalsy: true })
+        .trim()
+        .isLength({ min: 5, max: 500 }).withMessage('Endereço deve ter entre 5 e 500 caracteres.')
+        .escape()
 ];
-const validateStockItem = () => [ /* ... (código anterior - ajustado para REAL) ... */
-    check('name').trim().notEmpty().withMessage('Nome do item obrigatório.').isLength({ min: 2 }),
-    check('quantity').notEmpty().withMessage('Quantidade obrigatória.').isFloat({ min: 0.0 }).withMessage('Quantidade inválida.').toFloat(),
-    check('category').optional({ checkFalsy: true }).trim().isString(),
-    check('properties').optional().isObject().withMessage('Propriedades devem ser um objeto JSON.'),
-    check('properties.barcode').optional({ checkFalsy: true }).isString().trim(),
-    check('properties.description').optional({ checkFalsy: true }).isString().trim(),
-    // Adicionar validações para outros campos em properties
+const validateStockItem = () => [
+    check('name')
+        .trim()
+        .notEmpty().withMessage('Nome do item obrigatório.')
+        .isLength({ min: 2, max: 200 }).withMessage('Nome deve ter entre 2 e 200 caracteres.')
+        .matches(/^[a-zA-ZàáâãéêíóôõúçÀÁÂÃÉÊÍÓÔÕÚÇ0-9\s\-_.()]+$/).withMessage('Nome contém caracteres inválidos.')
+        .escape(),
+    check('quantity')
+        .notEmpty().withMessage('Quantidade obrigatória.')
+        .isFloat({ min: 0.0, max: 999999.99 }).withMessage('Quantidade deve estar entre 0 e 999999.99.')
+        .toFloat(),
+    check('category')
+        .optional({ checkFalsy: true })
+        .trim()
+        .isLength({ max: 100 }).withMessage('Categoria muito longa.')
+        .escape(),
+    check('properties')
+        .optional()
+        .isObject().withMessage('Propriedades devem ser um objeto JSON.')
+        .custom((value) => {
+            // Validar que o objeto não é muito grande
+            const jsonString = JSON.stringify(value);
+            if (jsonString.length > 10000) {
+                throw new Error('Propriedades muito extensas.');
+            }
+            return true;
+        }),
+    check('properties.barcode')
+        .optional({ checkFalsy: true })
+        .isString()
+        .trim()
+        .isLength({ max: 50 }).withMessage('Código de barras muito longo.')
+        .matches(/^[a-zA-Z0-9\-]+$/).withMessage('Código de barras deve conter apenas letras, números e hífens.')
+        .escape(),
+    check('properties.description')
+        .optional({ checkFalsy: true })
+        .isString()
+        .trim()
+        .isLength({ max: 1000 }).withMessage('Descrição muito longa.')
+        .escape(),
+    check('properties.unitPrice')
+        .optional({ checkFalsy: true })
+        .isFloat({ min: 0 }).withMessage('Preço unitário deve ser positivo.')
+        .toFloat(),
+    check('properties.minimumStock')
+        .optional({ checkFalsy: true })
+        .isFloat({ min: 0 }).withMessage('Estoque mínimo deve ser positivo.')
+        .toFloat()
 ];
 
 // Validação para grupos de itens

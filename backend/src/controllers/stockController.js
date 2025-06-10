@@ -14,10 +14,14 @@ const {
     sendSuccessResponse 
 } = require('../utils/errorHandler');
 
-// Import platform URL service for cross-platform URL handling
-const PlatformUrlService = require('../shared/services/platform-url-service');
-
 const UPLOAD_DIR = process.env.UPLOAD_FOLDER || 'uploads';
+
+// Helper function to build image URLs
+function buildImageUrl(filename) {
+    if (!filename) return null;
+    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+    return `${baseUrl}/${UPLOAD_DIR}/${filename}`;
+}
 
 // GET /api/stores/:storeId/stock
 exports.getAllStockItems = catchAsync(async (req, res, next) => {
@@ -26,7 +30,7 @@ exports.getAllStockItems = catchAsync(async (req, res, next) => {
     const items = await db.findStockItemsByStore(storeId);    const itemsWithFullUrls = items.map(item => ({
         ...item,
         image_filename: undefined,
-        imageUrl: PlatformUrlService.buildImageUrl(item.image_filename)
+        imageUrl: buildImageUrl(item.image_filename)
     }));
     
     sendSuccessResponse(res, itemsWithFullUrls, 'Itens carregados com sucesso');
@@ -40,11 +44,10 @@ exports.getStockItemById = catchAsync(async (req, res, next) => {
     const item = await db.findStockItemByIdAndStore(itemId, storeId);
     if (!item) {
         return notFound('Item');
-    }
-      const itemWithUrl = {
+    }      const itemWithUrl = {
         ...item,
         image_filename: undefined,
-        imageUrl: PlatformUrlService.buildImageUrl(item.image_filename)
+        imageUrl: buildImageUrl(item.image_filename)
     };
     
     sendSuccessResponse(res, itemWithUrl, 'Item encontrado com sucesso');
@@ -81,11 +84,10 @@ exports.createStockItem = catchAsync(async (req, res, next) => {
     const newItem = await db.findStockItemByIdAndStore(result.lastID, storeId);
     if (!newItem) {
         throw new AppError('Erro ao buscar item após criação.', 500);
-    }
-      const itemWithUrl = {
+    }      const itemWithUrl = {
         ...newItem,
         image_filename: undefined,
-        imageUrl: PlatformUrlService.buildImageUrl(newItem.image_filename)
+        imageUrl: buildImageUrl(newItem.image_filename)
     };
     
     sendSuccessResponse(res, itemWithUrl, 'Item criado com sucesso', 201);
@@ -128,11 +130,10 @@ exports.updateStockItem = catchAsync(async (req, res, next) => {
     const updatedItem = await db.findStockItemByIdAndStore(itemId, storeId);
     if (!updatedItem) {
         throw new AppError('Erro ao buscar item após atualização.', 500);    }
-    
-    const itemWithUrl = {
+      const itemWithUrl = {
         ...updatedItem,
         image_filename: undefined,
-        imageUrl: PlatformUrlService.buildImageUrl(updatedItem.image_filename)
+        imageUrl: buildImageUrl(updatedItem.image_filename)
     };
     
     sendSuccessResponse(res, itemWithUrl, 'Item atualizado com sucesso');
@@ -229,7 +230,7 @@ exports.uploadStockItemImage = catchAsync(async (req, res, next) => {
         }        const itemWithUrl = {
             ...updatedItem,
             image_filename: undefined,
-            imageUrl: PlatformUrlService.buildImageUrl(updatedItem.image_filename)
+            imageUrl: buildImageUrl(updatedItem.image_filename)
         };
         
         console.log(`Upload concluído com sucesso. URL da imagem: ${itemWithUrl.imageUrl}`);
@@ -279,7 +280,7 @@ exports.deleteStockItemImage = catchAsync(async (req, res, next) => {
     }    const itemWithUrl = {
         ...updatedItem,
         image_filename: undefined,
-        imageUrl: PlatformUrlService.buildImageUrl(updatedItem.image_filename) // Should be null now
+        imageUrl: buildImageUrl(updatedItem.image_filename) // Should be null now
     };
     
     sendSuccessResponse(res, itemWithUrl, 'Imagem removida com sucesso');

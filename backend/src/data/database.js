@@ -1,34 +1,137 @@
 // src/data/database.js
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-// Corrigido o path para o .env na raiz do backend
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+const config = require('../config/config');
 
-// Usa variável de ambiente ou um padrão seguro
-const dbPath = process.env.SQLITE_PATH || path.resolve(__dirname, '../../inventory_data.db');
+// Usa configuração centralizada
+const dbPath = config.database.path;
 let db; // Instância do banco de dados
+
+/**
+ * Classe para gerenciar transações
+ */
+class Transaction {
+    constructor(database) {
+        this.db = database;
+        this.inTransaction = false;
+    }
+
+    async begin() {
+        if (this.inTransaction) {
+            throw new Error('Transação já iniciada');
+        }
+        
+        return new Promise((resolve, reject) => {
+            this.db.run('BEGIN TRANSACTION', (err) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    this.inTransaction = true;
+                    resolve();
+                }
+            });
+        });
+    }
+
+    async commit() {
+        if (!this.inTransaction) {
+            throw new Error('Nenhuma transação ativa');
+        }
+        
+        return new Promise((resolve, reject) => {
+            this.db.run('COMMIT', (err) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    this.inTransaction = false;
+                    resolve();
+                }
+            });
+        });
+    }
+
+    async rollback() {
+        if (!this.inTransaction) {
+            throw new Error('Nenhuma transação ativa');
+        }
+        
+        return new Promise((resolve, reject) => {
+            this.db.run('ROLLBACK', (err) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    this.inTransaction = false;
+                    resolve();
+                }
+            });
+        });
+    }
+}
+
+/**
+ * Wrapper para executar operações em transação
+ */
+async function withTransaction(operation) {
+    const transaction = new Transaction(db);
+    try {
+        await transaction.begin();
+        const result = await operation(db);
+        await transaction.commit();
+        return result;
+    } catch (error) {
+        await transaction.rollback();
+        throw error;
+    }
+}
 
 // Função para conectar ao banco de dados
 function connectDb() {
     return new Promise((resolve, reject) => {
-        db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
+        db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, async (err) => {
             if (err) {
                 console.error("Erro ao conectar/criar SQLite:", err.message);
                 reject(err);
             } else {
                 console.log("Conectado ao banco de dados SQLite:", dbPath);
-                db.run('PRAGMA foreign_keys = ON;', (fkErr) => {
-                    if (fkErr) {
-                        console.error("Erro ao habilitar foreign keys:", fkErr.message);
-                        reject(fkErr);
-                    } else {
-                        console.log("Foreign key constraints habilitadas.");
-                        resolve(db);
-                    }
-                });
+                
+                try {
+                    // Configurar PRAGMAs para melhor performance e segurança
+                    await runPragmaConfigurations();
+                    console.log("Foreign key constraints habilitadas.");
+                    console.log("Configurações de performance aplicadas.");
+                    resolve(db);
+                } catch (pragmaErr) {
+                    console.error("Erro ao configurar PRAGMAs:", pragmaErr.message);
+                    reject(pragmaErr);
+                }
             }
         });
     });
+}
+
+/**
+ * Configurar PRAGMAs para otimização
+ */
+async function runPragmaConfigurations() {
+    const pragmas = [
+        'PRAGMA foreign_keys = ON',
+        `PRAGMA journal_mode = ${config.database.pragma.journal_mode}`,
+        `PRAGMA cache_size = ${config.database.pragma.cache_size}`,
+        `PRAGMA temp_store = ${config.database.pragma.temp_store}`,
+        `PRAGMA synchronous = ${config.database.pragma.synchronous}`,
+        'PRAGMA optimize'
+    ];
+
+    for (const pragma of pragmas) {
+        await new Promise((resolve, reject) => {
+            db.run(pragma, (err) => {
+                if (err) {
+                    console.warn(`Aviso ao executar ${pragma}:`, err.message);
+                }
+                resolve();
+            });
+        });
+    }
 }
 
 // Função para criar as tabelas se não existirem

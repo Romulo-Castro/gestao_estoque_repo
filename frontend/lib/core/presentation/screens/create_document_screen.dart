@@ -1,6 +1,5 @@
 // frontend/lib/core/presentation/screens/create_document_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/document_entity.dart';
@@ -14,7 +13,6 @@ import '../providers/supplier_provider.dart';
 import '../providers/stock_provider.dart';
 import '../providers/store_provider.dart';
 import '../widgets/app_drawer.dart';
-import '../widgets/improved_dropdown.dart';
 import '../../../shared/utils/error_handler.dart';
 
 class CreateDocumentScreen extends StatefulWidget {
@@ -135,7 +133,7 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Criar Documento'),
+        title: const Text('Criar Novo Documento'),
         actions: [
           if (_isSaving)
             const Padding(
@@ -143,13 +141,13 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
               child: SizedBox(
                 width: 24,
                 height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
               ),
             )
           else
             IconButton(
               onPressed: _saveDocument,
-              icon: const Icon(Icons.save),
+              icon: const Icon(Icons.save_as_outlined),
               tooltip: 'Salvar Documento',
             ),
         ],
@@ -163,7 +161,7 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildDocumentHeader(),
                     const SizedBox(height: 24),
@@ -181,38 +179,47 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
 
   Widget _buildDocumentHeader() {
     return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Informações do Documento',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),            const SizedBox(height: 16),
-            // Use Wrap para permitir quebra de linha em telas pequenas
+              'Detalhes do Documento',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
             LayoutBuilder(
               builder: (context, constraints) {
-                // Em telas pequenas (< 600px), mostrar campos verticalmente
-                if (constraints.maxWidth < 600) {
-                  return Column(
-                    children: [
-                      TextFormField(
+                bool useColumnLayout = constraints.maxWidth < 600;
+                return Flex(
+                  direction: useColumnLayout ? Axis.vertical : Axis.horizontal,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: TextFormField(
                         controller: _numberController,
                         decoration: const InputDecoration(
-                          labelText: 'Número',
+                          labelText: 'Número do Documento',
                           border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.confirmation_number_outlined),
                         ),
-                        validator: (value) => value?.isEmpty == true ? 'Campo obrigatório' : null,                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<DocumentType>(
+                        validator: (value) => value?.isEmpty == true ? 'Campo obrigatório' : null,
+                      ),
+                    ),
+                    SizedBox(width: useColumnLayout ? 0 : 16, height: useColumnLayout ? 16 : 0),
+                    Flexible(
+                      child: DropdownButtonFormField<DocumentType>(
                         value: _selectedType,
                         decoration: const InputDecoration(
-                          labelText: 'Tipo',
+                          labelText: 'Tipo de Documento',
                           border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.article_outlined),
                         ),
                         items: DocumentType.values
-                            .where((type) => type != DocumentType.unknown) // Remove tipo desconhecido
+                            .where((type) => type != DocumentType.unknown)
                             .map((type) {
                           return DropdownMenuItem(
                             value: type,
@@ -223,102 +230,57 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
                           if (value != null) {
                             setState(() {
                               _selectedType = value;
-                              // Limpar seleções quando o tipo mudar
                               _selectedCustomer = null;
                               _selectedSupplier = null;
                             });
                           }
                         },
                       ),
-                    ],
-                  );
-                } else {
-                  // Em telas maiores, mostrar lado a lado
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _numberController,
-                          decoration: const InputDecoration(
-                            labelText: 'Número',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) => value?.isEmpty == true ? 'Campo obrigatório' : null,
-                        ),
-                      ),
-                      const SizedBox(width: 16),                      Expanded(
-                        child: DropdownButtonFormField<DocumentType>(
-                          value: _selectedType,
-                          decoration: const InputDecoration(
-                            labelText: 'Tipo',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: DocumentType.values
-                              .where((type) => type != DocumentType.unknown) // Remove tipo desconhecido
-                              .map((type) {
-                            return DropdownMenuItem(
-                              value: type,
-                              child: Text(_getTypeLabel(type)),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                _selectedType = value;
-                                // Limpar seleções quando o tipo mudar
-                                _selectedCustomer = null;
-                                _selectedSupplier = null;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  );
-                }
+                    ),
+                  ],
+                );
               },
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _dateController,
               decoration: const InputDecoration(
-                labelText: 'Data',
+                labelText: 'Data de Emissão',
                 border: OutlineInputBorder(),
-                suffixIcon: Icon(Icons.calendar_today),
+                prefixIcon: Icon(Icons.calendar_today_outlined),
               ),
               readOnly: true,
               onTap: _selectDate,
-            ),            const SizedBox(height: 16),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                // Para documentos de entrada, mostrar apenas fornecedor
-                if (_selectedType == DocumentType.entrada) {
-                  return _buildSupplierDropdown();
-                }
-                // Para documentos de saída, mostrar apenas cliente
-                else if (_selectedType == DocumentType.saida) {
-                  return _buildCustomerDropdown();
-                }
-                // Para tipos desconhecidos ou outros, não mostrar nada
-                else {
-                  return const SizedBox.shrink();
-                }
+            ),
+            const SizedBox(height: 16),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (Widget child, Animation<double> animation) {
+                return FadeTransition(opacity: animation, child: child);
               },
+              child: _selectedType == DocumentType.entrada
+                  ? _buildSupplierDropdown()
+                  : _selectedType == DocumentType.saida
+                      ? _buildCustomerDropdown()
+                      : const SizedBox.shrink(),
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _notesController,
               decoration: const InputDecoration(
-                labelText: 'Observações',
+                labelText: 'Observações Adicionais',
                 border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.notes_outlined),
               ),
               maxLines: 3,
+              textInputAction: TextInputAction.done,
             ),
           ],
         ),
       ),
     );
   }
+
   Widget _buildCustomerDropdown() {
     return Consumer<CustomerProvider>(
       builder: (context, provider, child) {
@@ -327,6 +289,7 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
           decoration: const InputDecoration(
             labelText: 'Cliente *',
             border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.person_outline),
           ),
           items: provider.customers.map((customer) {
             return DropdownMenuItem(
@@ -344,6 +307,7 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
       },
     );
   }
+
   Widget _buildSupplierDropdown() {
     return Consumer<SupplierProvider>(
       builder: (context, provider, child) {
@@ -352,6 +316,7 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
           decoration: const InputDecoration(
             labelText: 'Fornecedor *',
             border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.store_mall_directory_outlined),
           ),
           items: provider.suppliers.map((supplier) {
             return DropdownMenuItem(
@@ -369,68 +334,58 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
       },
     );
   }
-
   Widget _buildItemsSection() {
     return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                // Em telas pequenas (< 600px), mostrar título e botão verticalmente
-                if (constraints.maxWidth < 600) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Itens do Documento',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: _showAddItemDialog,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Adicionar Item'),
-                        ),
-                      ),
-                    ],
-                  );
-                } else {
-                  // Em telas maiores, mostrar lado a lado
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Itens do Documento',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: _showAddItemDialog,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Adicionar Item'),
-                      ),
-                    ],
-                  );
-                }
-              },
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Itens do Documento',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                onPressed: _showAddItemDialog,
+                icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
+                label: const Text('Adicionar Item', style: TextStyle(fontSize: 14)),
+              ),
+            ),
+            const SizedBox(height: 20),
             if (_items.isEmpty)
-              const Center(
+              Center(
                 child: Padding(
-                  padding: EdgeInsets.all(32.0),
-                  child: Text('Nenhum item adicionado'),
+                  padding: const EdgeInsets.symmetric(vertical: 40.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.inventory_2_outlined, size: 60, color: Theme.of(context).hintColor),
+                      const SizedBox(height: 16),
+                      Text('Nenhum item adicionado ainda.', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      Text('Clique em "Adicionar Item" para começar.', style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ),
                 ),
               )
             else
-              ListView.builder(
+              ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _items.length,
                 itemBuilder: (context, index) => _buildItemCard(_items[index], index),
+                separatorBuilder: (context, index) => const Divider(height: 1),
               ),
           ],
         ),
@@ -439,23 +394,50 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
   }
 
   Widget _buildItemCard(DocumentItemModel item, int index) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8.0),
-      child: ListTile(
-        leading: CircleAvatar(
-          child: Text(item.stockItemName.isNotEmpty 
-              ? item.stockItemName.substring(0, 1).toUpperCase()
-              : '?'),
-        ),
-        title: Text(item.stockItemName),
-        subtitle: Text(
-          'Qtd: ${item.quantity.toStringAsFixed(2)} | '
-          'Preço: R\$ ${item.unitValue.toStringAsFixed(2)} | '
-          'Total: R\$ ${item.totalValue.toStringAsFixed(2)}',
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete, color: Colors.red),
-          onPressed: () => _removeItem(index),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onLongPress: () => _removeItem(index), // Example: long press to remove
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12.0),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Theme.of(context).primaryColorLight,
+                child: Text(
+                  item.stockItemName.isNotEmpty 
+                      ? item.stockItemName.substring(0, 1).toUpperCase()
+                      : '?',
+                  style: TextStyle(color: Theme.of(context).primaryColorDark, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.stockItemName, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Qtd: ${item.quantity.toStringAsFixed(2)}  |  Preço Unit.: R\$ ${item.unitValue.toStringAsFixed(2)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                'R\$ ${item.totalValue.toStringAsFixed(2)}',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: Icon(Icons.delete_outline, color: Colors.red.shade700),
+                tooltip: 'Remover Item',
+                onPressed: () => _removeItem(index),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -464,92 +446,77 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
   Widget _buildTotalSection() {
     final totalValue = _items.fold<double>(0.0, (sum, item) => sum + item.totalValue);
     
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // Em telas pequenas (< 600px), mostrar total e botão verticalmente
-          if (constraints.maxWidth < 600) {
-            return Column(
-              children: [
-                Text(
-                  'Total: R\$ ${totalValue.toStringAsFixed(2)}',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+    return Material(
+      elevation: 8,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+        ),
+        child: SafeArea( // Ensures content is not obscured by system UI like bottom navigation bars
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              bool useColumnLayout = constraints.maxWidth < 400; // Adjusted breakpoint
+              return Flex(
+                direction: useColumnLayout ? Axis.vertical : Axis.horizontal,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: useColumnLayout ? CrossAxisAlignment.stretch : CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    'Total Geral: R\$ ${totalValue.toStringAsFixed(2)}',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).primaryColor,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
+                  SizedBox(height: useColumnLayout ? 12 : 0, width: useColumnLayout ? 0 : 16),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                     onPressed: _isSaving ? null : _saveDocument,
                     icon: _isSaving 
                         ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Icon(Icons.save),
-                    label: Text(_isSaving ? 'Salvando...' : 'Salvar'),
+                        : const Icon(Icons.check_circle_outline),
+                    label: Text(_isSaving ? 'Salvando...' : 'Concluir e Salvar'),
                   ),
-                ),
-              ],
-            );
-          } else {
-            // Em telas maiores, mostrar lado a lado
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Total: R\$ ${totalValue.toStringAsFixed(2)}',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _isSaving ? null : _saveDocument,
-                  icon: _isSaving 
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save),
-                  label: Text(_isSaving ? 'Salvando...' : 'Salvar'),
-                ),
-              ],
-            );
-          }
-        },
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
-  }  void _showAddItemDialog() {
+  }
+
+  void _showAddItemDialog() {
     _selectedStockItem = null;
     _quantityController.clear();
     _priceController.clear();
 
     showDialog(
       context: context,
-      barrierDismissible: true, // Permite fechar o diálogo clicando fora
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setDialogState) => Dialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8), // Bordas arredondadas
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Container(
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(context).size.height * 0.8,
-              maxWidth: 500, // Maximum width for better UX
+              maxWidth: 500,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -558,7 +525,7 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
                 Container(
                   padding: const EdgeInsets.all(16.0),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor,
+                    color: Theme.of(dialogContext).primaryColor,
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(8),
                       topRight: Radius.circular(8),
@@ -579,7 +546,7 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
                         ),
                       ),
                       IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: () => Navigator.of(dialogContext).pop(),
                         icon: const Icon(Icons.close, color: Colors.white),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
@@ -602,97 +569,49 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
                                 child: Text('Nenhum item disponível em estoque'),
                               );
                             }
-                            
-                            // Usando Theme para garantir cores e comportamento consistentes
                             return Theme(
-                              data: Theme.of(context).copyWith(
-                                canvasColor: Theme.of(context).scaffoldBackgroundColor,
+                              data: Theme.of(dialogContext).copyWith(
+                                canvasColor: Theme.of(dialogContext).scaffoldBackgroundColor,
                               ),
                               child: DropdownButtonFormField<StockItem>(
                                 value: _selectedStockItem,
                                 decoration: const InputDecoration(
-                                  labelText: 'Selecione um Item *',
+                                  labelText: 'Selecionar Item do Estoque',
                                   border: OutlineInputBorder(),
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  prefixIcon: Icon(Icons.inventory_2_outlined),
                                 ),
                                 isExpanded: true,
-                                menuMaxHeight: 300, // Aumentar altura para melhor visualização
-                                dropdownColor: Theme.of(context).scaffoldBackgroundColor,
-                                alignment: AlignmentDirectional.centerStart,
-                                items: stockProvider.items.map((item) {
-                                  final isLowStock = item.quantity < 5;
-                                  return DropdownMenuItem(
+                                menuMaxHeight: 300,
+                                items: stockProvider.items.map((StockItem item) {
+                                  return DropdownMenuItem<StockItem>(
                                     value: item,
-                                    child: SizedBox(
-                                      width: double.infinity,
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            item.name,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          Text(
-                                            'Estoque: ${item.quantity.toStringAsFixed(0)}${isLowStock ? ' (Baixo)' : ''}',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: isLowStock ? Colors.red : Colors.grey[600],
-                                              fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                                    child: Text(item.name),
                                   );
                                 }).toList(),
-                                onChanged: (value) {
+                                onChanged: (StockItem? value) {
                                   setDialogState(() {
                                     _selectedStockItem = value;
-                                    if (value != null && value.price != null) {
-                                      _priceController.text = value.price!.toStringAsFixed(2);
-                                    }
                                   });
                                 },
-                                validator: (value) => value == null ? 'Selecione um item' : null,
-                              ),
-                            );
+                                  validator: (StockItem? value) =>
+                                      value == null ? 'Selecione um item' : null,
+                                ),
+                              );
                           },
                         ),
-                        // Adicionando espaço extra depois do dropdown para evitar problemas de overlay
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
                         TextFormField(
                           controller: _quantityController,
-                          decoration: InputDecoration(
-                            labelText: 'Quantidade *',
-                            border: const OutlineInputBorder(),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            suffixText: _selectedStockItem != null 
-                                ? 'Máx: ${_selectedStockItem!.quantity.toStringAsFixed(0)}'
-                                : null,
+                          decoration: const InputDecoration(
+                            labelText: 'Quantidade',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.format_list_numbered),
                           ),
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                          ],
                           validator: (value) {
-                            if (value == null || value.isEmpty) return 'Digite a quantidade';
-                            final quantity = double.tryParse(value);
-                            if (quantity == null || quantity <= 0) return 'Quantidade deve ser maior que zero';
-                            if (_selectedStockItem != null && _selectedType == DocumentType.saida) {
-                              if (quantity > _selectedStockItem!.quantity) {
-                                return 'Quantidade maior que estoque disponível';
-                              }
-                            }
+                            if (value == null || value.isEmpty) return 'Campo obrigatório';
+                            if (double.tryParse(value) == null) return 'Número inválido';
+                            if (double.parse(value) <= 0) return 'Quantidade deve ser maior que zero';
                             return null;
                           },
                         ),
@@ -700,49 +619,18 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
                         TextFormField(
                           controller: _priceController,
                           decoration: const InputDecoration(
-                            labelText: 'Preço Unitário *',
+                            labelText: 'Preço Unitário (R\$)',
                             border: OutlineInputBorder(),
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            prefixText: 'R\$ ',
+                            prefixIcon: Icon(Icons.attach_money_outlined),
                           ),
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                          ],
                           validator: (value) {
-                            if (value == null || value.isEmpty) return 'Digite o preço';
-                            final price = double.tryParse(value);
-                            if (price == null || price < 0) return 'Preço deve ser maior ou igual a zero';
+                            if (value == null || value.isEmpty) return 'Campo obrigatório';
+                            if (double.tryParse(value) == null) return 'Número inválido';
+                            if (double.parse(value) < 0) return 'Preço não pode ser negativo';
                             return null;
                           },
                         ),
-                        if (_selectedStockItem != null && _selectedType == DocumentType.saida) ...[
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.blue.shade200),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.info, size: 20, color: Colors.blue.shade700),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Estoque disponível: ${_selectedStockItem!.quantity.toStringAsFixed(0)} unidades',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.blue.shade700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -751,35 +639,41 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
                 Container(
                   padding: const EdgeInsets.all(16.0),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(8),
-                      bottomRight: Radius.circular(8),
-                    ),
+                    color: Theme.of(dialogContext).scaffoldBackgroundColor,
+                    border: Border(top: BorderSide(color: Theme.of(dialogContext).dividerColor)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: () => Navigator.of(dialogContext).pop(),
                         child: const Text('Cancelar'),
                       ),
                       const SizedBox(width: 8),
-                      ElevatedButton(
+                      ElevatedButton.icon(
                         onPressed: () {
-                          if (_selectedStockItem != null &&
-                              _quantityController.text.isNotEmpty &&
-                              _priceController.text.isNotEmpty) {
-                            final quantity = double.tryParse(_quantityController.text) ?? 0.0;
-                            final price = double.tryParse(_priceController.text) ?? 0.0;
-                            
-                            if (quantity > 0 && price >= 0) {
-                              _addItem();
-                              Navigator.of(context).pop();
-                            }
+                          final quantityValid = (_quantityController.text.isNotEmpty && double.tryParse(_quantityController.text) != null && double.parse(_quantityController.text) > 0);
+                          final priceValid = (_priceController.text.isNotEmpty && double.tryParse(_priceController.text) != null && double.parse(_priceController.text) >= 0);
+                          final itemSelected = _selectedStockItem != null;
+
+                          if (itemSelected && quantityValid && priceValid) {
+                            _addItem();
+                            Navigator.of(dialogContext).pop();
+                          } else {
+                             ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('Por favor, preencha todos os campos corretamente.'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
                           }
                         },
-                        child: const Text('Adicionar'),
+                        icon: const Icon(Icons.add_circle_outline),
+                        label: const Text('Adicionar'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(dialogContext).primaryColor,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                     ],
                   ),
@@ -788,9 +682,10 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
             ),
           ),
         ),
-      ),
+      )
     );
   }
+
   void _addItem() {
     if (_selectedStockItem == null) return;
 
@@ -799,7 +694,6 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
 
     if (quantity <= 0 || price < 0) return;
 
-    // Validação de estoque para documentos de saída
     if (_selectedType == DocumentType.saida) {
       final currentItemQuantity = _items
           .where((item) => item.stockItemId == _selectedStockItem!.id)
@@ -812,33 +706,28 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
           SnackBar(
             content: Text(
               'Quantidade insuficiente em estoque!\n'
-              'Disponível: ${_selectedStockItem!.quantity.toStringAsFixed(0)}\n'
-              'Já selecionado: ${currentItemQuantity.toStringAsFixed(0)}\n'
-              'Solicitado: ${quantity.toStringAsFixed(0)}',
+              'Disponível: ${_selectedStockItem!.quantity.toStringAsFixed(0)}, '
+              'Já Adicionado: ${currentItemQuantity.toStringAsFixed(0)}',
             ),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
           ),
         );
         return;
       }
     }
 
-    // Check if item already exists
     final existingIndex = _items.indexWhere(
       (item) => item.stockItemId == _selectedStockItem!.id,
     );
 
     setState(() {
       if (existingIndex != -1) {
-        // Update existing item
         final existingItem = _items[existingIndex];
         _items[existingIndex] = existingItem.copyWith(
           quantity: existingItem.quantity + quantity,
           unitValue: price,
         );
       } else {
-        // Add new item
         _items.add(DocumentItemModel(
           quantity: quantity,
           unitValue: price,
@@ -851,28 +740,39 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
 
   void _removeItem(int index) {
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remover Item'),
-        content: Text('Deseja remover "${_items[index].stockItemName}" do documento?'),
+      context: context, 
+      builder: (BuildContext dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Confirmar Remoção'),
+        content: Text('Tem certeza que deseja remover "${_items[index].stockItemName}" da lista de itens?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             onPressed: () {
               setState(() {
                 _items.removeAt(index);
               });
-              Navigator.of(context).pop();
+              Navigator.of(dialogContext).pop(); 
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Item removido com sucesso.'),
+                  backgroundColor: Colors.green,
+                ),
+              );
             },
-            child: const Text('Remover', style: TextStyle(color: Colors.white)),
+            child: const Text('Remover Definitivamente'),
           ),
         ],
-      ),
-    );
+      ), 
+    ); 
   }
 
   void _selectDate() async {
@@ -890,10 +790,10 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
       });
     }
   }
+
   Future<void> _saveDocument() async {
     if (!_formKey.currentState!.validate()) return;
     
-    // Validar se cliente/fornecedor foi selecionado conforme o tipo
     if (_selectedType == DocumentType.entrada && _selectedSupplier == null) {
       ErrorHandler.showErrorSnackBar(context, 'Selecione um fornecedor para documentos de entrada');
       return;
@@ -919,7 +819,8 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
         throw Exception('Nenhuma loja selecionada');
       }
 
-      final totalValue = _items.fold<double>(0.0, (sum, item) => sum + item.totalValue);      final document = DocumentModel(
+      final totalValue = _items.fold<double>(0.0, (sum, item) => sum + item.totalValue);
+      final document = DocumentModel(
         number: _numberController.text.trim(),
         type: _getTypeString(_selectedType),
         description: _notesController.text.trim(),
@@ -948,6 +849,7 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
       }
     }
   }
+
   String _getTypeLabel(DocumentType type) {
     switch (type) {
       case DocumentType.entrada:
@@ -955,7 +857,7 @@ class _CreateDocumentScreenState extends State<CreateDocumentScreen>
       case DocumentType.saida:
         return 'Saída';
       case DocumentType.unknown:
-        return 'Desconhecido'; // Mantém para compatibilidade, mas não será exibido
+        return 'Desconhecido';
     }
   }
 
