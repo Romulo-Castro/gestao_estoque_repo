@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-ISC-yellow.svg)](LICENSE)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
 
-> Sistema completo de gestão de estoque empresarial construído com Flutter (frontend) e Node.js (backend), implementando **Clean Architecture** e padrões de desenvolvimento modernos.
+> Sistema completo de gestão de estoque empresarial construído com Flutter (frontend) e Node.js (backend), implementado por Rômulo Narcizo de Paula Castro.
 
 ## 🌟 Características Principais
 
